@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh issue:*)",
+      "Bash(gh issue create --title '[Foundation] Frontend auth — setup page, login page, TOTP prompt' --label foundation,frontend,auth --body ':*)",
+      "Bash(gh label:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"require\\('better-sqlite3'\\)\")"
+    ]
+  }
+}
