@@ -85,5 +85,16 @@ export function start(): void {
       console.error(`[Scheduler] Tick failed: ${err.message}`);
     });
   });
-  console.log('[Scheduler] Started — polling every minute');
+
+  // Daily rollup at 23:55
+  cron.schedule('55 23 * * *', () => {
+    try {
+      const { runDailyRollup } = require('../rollup/daily');
+      runDailyRollup();
+    } catch (err: any) {
+      console.error(`[Scheduler] Daily rollup failed: ${err.message}`);
+    }
+  });
+
+  console.log('[Scheduler] Started — polling every minute, daily rollup at 23:55');
 }
