@@ -96,5 +96,27 @@ export function start(): void {
     }
   });
 
-  console.log('[Scheduler] Started — polling every minute, daily rollup at 23:55');
+  // Weekly rollup at Sunday 23:58
+  cron.schedule('58 23 * * 0', () => {
+    try {
+      const { runWeeklyRollup } = require('../rollup/weekly');
+      runWeeklyRollup();
+    } catch (err: any) {
+      console.error(`[Scheduler] Weekly rollup failed: ${err.message}`);
+    }
+  });
+
+  // Monthly rollup at 23:59 on 28th–31st (only runs if tomorrow is a new month)
+  cron.schedule('59 23 28-31 * *', () => {
+    try {
+      const { isTomorrowNewMonth, runMonthlyRollup } = require('../rollup/monthly');
+      if (isTomorrowNewMonth()) {
+        runMonthlyRollup();
+      }
+    } catch (err: any) {
+      console.error(`[Scheduler] Monthly rollup failed: ${err.message}`);
+    }
+  });
+
+  console.log('[Scheduler] Started — polling every minute, rollups at 23:55/23:58/23:59');
 }
