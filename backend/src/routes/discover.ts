@@ -114,7 +114,7 @@ router.get('/:id/discover', async (req: Request, res: Response) => {
             // Aggregate by page URL (entries are daily rows)
             const pageMap = new Map<string, { impressions: number; clicks: number }>();
             for (const entry of entries) {
-              const url = entry.Query || entry.query || entry.Url || entry.url;
+              const url = entry.Query || entry.query || entry.Page || entry.page || entry.Url || entry.url;
               if (!url) continue;
               const existing = pageMap.get(url) || { impressions: 0, clicks: 0 };
               existing.impressions += entry.Impressions ?? 0;

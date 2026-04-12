@@ -270,6 +270,9 @@ function AccountsTab() {
   const [showModal, setShowModal] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [defaultPlatform, setDefaultPlatform] = useState('github');
+  const [expandedAccount, setExpandedAccount] = useState<number | null>(null);
+  const [accountItems, setAccountItems] = useState<Array<{ id: number; display_name: string; platform_identifier: string }>>([]);
+  const [backfillingId, setBackfillingId] = useState<number | null>(null);
 
   const loadAccounts = async () => {
     try {
@@ -279,6 +282,39 @@ function AccountsTab() {
   };
 
   useEffect(() => { loadAccounts(); }, []);
+
+  const toggleExpand = async (accountId: number) => {
+    if (expandedAccount === accountId) {
+      setExpandedAccount(null);
+      setAccountItems([]);
+      return;
+    }
+    setExpandedAccount(accountId);
+    try {
+      const items = await apiGet<Array<{ id: number; display_name: string; platform_identifier: string }>>(`/items/by-account/${accountId}`);
+      setAccountItems(items);
+    } catch {
+      setAccountItems([]);
+    }
+  };
+
+  const handleBackfill = async (itemId: number) => {
+    setBackfillingId(itemId);
+    try {
+      await apiPost(`/items/${itemId}/backfill`);
+    } catch { /* ignore */ }
+    setTimeout(() => setBackfillingId(null), 3000);
+  };
+
+  const handleBackfillAll = async (accountId: number) => {
+    for (const item of accountItems) {
+      setBackfillingId(item.id);
+      try {
+        await apiPost(`/items/${item.id}/backfill`);
+      } catch { /* ignore */ }
+    }
+    setTimeout(() => setBackfillingId(null), 3000);
+  };
 
   const connectedPlatforms = accounts.map(a => a.platform);
 
@@ -293,18 +329,59 @@ function AccountsTab() {
       {accounts.map(a => {
         const platformName = a.platform.charAt(0).toUpperCase() + a.platform.slice(1);
         const displayPlatform = a.platform === 'ga4' ? 'GA4' : platformName;
+        const isExpanded = expandedAccount === a.id;
         return (
-          <div key={a.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <PlatformPill platform={displayPlatform} />
-              <div style={{ fontSize: 10, color: C.textFaint, marginTop: 5, fontFamily: font }}>
-                {a.display_name} · polls every {a.polling_interval_min} min
+          <div key={a.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ cursor: 'pointer' }} onClick={() => toggleExpand(a.id)}>
+                <PlatformPill platform={displayPlatform} />
+                <div style={{ fontSize: 10, color: C.textFaint, marginTop: 5, fontFamily: font }}>
+                  {a.display_name} · polls every {a.polling_interval_min} min {isExpanded ? '▲' : '▼'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setEditAccount(a); setShowModal(true); }} style={{ padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMid, fontSize: 11, cursor: 'pointer', fontFamily: font }}>Edit</button>
+                <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Remove</button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setEditAccount(a); setShowModal(true); }} style={{ padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMid, fontSize: 11, cursor: 'pointer', fontFamily: font }}>Edit</button>
-              <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Remove</button>
-            </div>
+            {isExpanded && (
+              <div style={{ borderTop: `1px solid ${C.border}`, padding: '10px 14px' }}>
+                {accountItems.length === 0 ? (
+                  <div style={{ fontSize: 11, color: C.textFaint, fontFamily: font }}>No tracked items</div>
+                ) : (
+                  <>
+                    {a.platform !== 'reddit' && (
+                      <div style={{ marginBottom: 10 }}>
+                        <button onClick={() => handleBackfillAll(a.id)} disabled={backfillingId !== null} style={{
+                          padding: '4px 12px', background: C.accent + '15',
+                          border: `1px solid ${C.accent}40`, borderRadius: 5,
+                          color: C.accent, fontSize: 10, fontWeight: 700,
+                          cursor: backfillingId !== null ? 'wait' : 'pointer', fontFamily: font,
+                          opacity: backfillingId !== null ? 0.6 : 1,
+                        }}>Backfill All (14 days)</button>
+                      </div>
+                    )}
+                    {accountItems.map(item => (
+                      <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: `1px solid ${C.border}22` }}>
+                        <div>
+                          <div style={{ fontSize: 12, color: C.text, fontFamily: font, fontWeight: 600 }}>{item.display_name}</div>
+                          <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font }}>{item.platform_identifier}</div>
+                        </div>
+                        {a.platform !== 'reddit' && (
+                          <button onClick={() => handleBackfill(item.id)} disabled={backfillingId === item.id} style={{
+                            padding: '3px 8px', background: 'none',
+                            border: `1px solid ${C.accent}55`, borderRadius: 4,
+                            color: C.accent, fontSize: 9,
+                            cursor: backfillingId === item.id ? 'wait' : 'pointer',
+                            fontFamily: font, opacity: backfillingId === item.id ? 0.6 : 1,
+                          }}>{backfillingId === item.id ? 'Backfilling...' : 'Backfill 14d'}</button>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         );
       })}

@@ -71,6 +71,7 @@ export default function Platform() {
   const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [dashboardItems, setDashboardItems] = useState<any[]>([]);
+  const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
 
   // Load accounts for this platform
   useEffect(() => {
@@ -110,13 +111,15 @@ export default function Platform() {
 
   // Load dashboard data for platform-level metrics
   useEffect(() => {
-    apiGet<{ items: any[] }>('/dashboard')
+    const params = new URLSearchParams();
+    params.set('range', timeRange);
+    apiGet<{ items: any[] }>(`/dashboard?${params}`)
       .then(data => {
         const filtered = data.items.filter(i => i.platform === platform);
         setDashboardItems(filtered);
       })
       .catch(() => {});
-  }, [platform, items]);
+  }, [platform, items, timeRange]);
 
   // Map dashboard items to lane data for LaneSummary
   const laneSummaryItems = dashboardItems.map(item => {
@@ -173,8 +176,22 @@ export default function Platform() {
 
   return (
     <div>
-      <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
-      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>{name}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+        <div>
+          <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>{name}</h1>
+        </div>
+        <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 8, padding: 2 }}>
+          {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
+            <button key={range} onClick={() => setTimeRange(range)} style={{
+              padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
+              border: 'none', color: timeRange === range ? '#fff' : C.textMid,
+              fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
+              borderRadius: 6, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
+            }}>{range}</button>
+          ))}
+        </div>
+      </div>
 
       {accounts.length === 0 ? (
         <EmptyState platform={name} />

@@ -57,6 +57,11 @@ router.post('/', (req: Request, res: Response) => {
 
   const item = createItem(metric_account_id, platform_identifier, display_name);
   res.status(201).json(item);
+
+  // Fire-and-forget: backfill 14 days of historical data
+  import('../backfill/historical').then(({ runHistoricalBackfill }) => {
+    runHistoricalBackfill(item.id, metric_account_id, account.platform, platform_identifier);
+  }).catch(err => console.error(`[Backfill] Import failed: ${err.message}`));
 });
 
 // PUT /api/items/:id
@@ -93,6 +98,29 @@ router.put('/:id', (req: Request, res: Response) => {
 
   const item = updateItem(id, updates);
   res.json(item);
+});
+
+// POST /api/items/:id/backfill — trigger 14-day historical data pull
+router.post('/:id/backfill', async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const item = getItemById(id);
+  if (!item) {
+    res.status(404).json({ error: 'Item not found' });
+    return;
+  }
+  const account = getAccountById(item.metric_account_id);
+  if (!account) {
+    res.status(404).json({ error: 'Account not found' });
+    return;
+  }
+  // Run backfill async, respond immediately
+  res.json({ success: true, message: 'Backfill started' });
+  try {
+    const { runHistoricalBackfill } = await import('../backfill/historical');
+    await runHistoricalBackfill(item.id, item.metric_account_id, account.platform, item.platform_identifier);
+  } catch (err: any) {
+    console.error(`[Backfill] Manual trigger failed for item ${id}: ${err.message}`);
+  }
 });
 
 // DELETE /api/items/:id
