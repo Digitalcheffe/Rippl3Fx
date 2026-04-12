@@ -1,6 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { getAllAccounts, getAccountById, createAccount, updateAccount, deleteAccount } from '../db/queries/accounts';
-import { encryptCredentials } from '../crypto/credentials';
+import { getAllAccounts, getAccountById, createAccount, updateAccount, deleteAccount, getActiveTrackedItems, updatePollSuccess, updatePollFailure } from '../db/queries/accounts';
+import { encryptCredentials, decryptCredentials } from '../crypto/credentials';
+import { collectGithub } from '../platforms/github';
+import { collectReddit } from '../platforms/reddit';
+import { collectGA4 } from '../platforms/ga4';
+import { collectBing } from '../platforms/bing';
+import { insertPollLog } from '../db/queries/logs';
+import type { GithubCredentials, RedditCredentials, GA4Credentials, BingCredentials } from '../types';
 
 const router = Router();
 
@@ -102,6 +108,66 @@ router.delete('/:id', (req: Request, res: Response) => {
     return;
   }
   res.json({ success: true });
+});
+
+// POST /api/accounts/:id/poll-now — trigger immediate poll
+router.post('/:id/poll-now', async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const account = getAccountById(id);
+  if (!account) {
+    res.status(404).json({ error: 'Account not found' });
+    return;
+  }
+
+  // Need the full account with credentials for polling
+  const db = require('../db/connection').default;
+  const fullAccount = db.prepare('SELECT * FROM metric_accounts WHERE id = ?').get(id) as any;
+
+  const items = getActiveTrackedItems(id);
+  if (items.length === 0) {
+    res.status(400).json({ error: 'No active tracked items for this account' });
+    return;
+  }
+
+  let credentials: any;
+  try {
+    credentials = decryptCredentials(fullAccount.credentials);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to decrypt credentials' });
+    return;
+  }
+
+  let allSuccess = true;
+  const results: Array<{ item: string; success: boolean }> = [];
+
+  for (const item of items) {
+    let result: { success: boolean; error?: string } = { success: false, error: 'Unknown platform' };
+    try {
+      switch (fullAccount.platform) {
+        case 'github': result = await collectGithub(item, credentials as GithubCredentials); break;
+        case 'reddit': result = await collectReddit(item, credentials as RedditCredentials); break;
+        case 'ga4': result = await collectGA4(item, credentials as GA4Credentials); break;
+        case 'bing': result = await collectBing(item, credentials as BingCredentials); break;
+      }
+    } catch (err: any) {
+      result = { success: false, error: err.message };
+    }
+    if (result.success) {
+      insertPollLog({ metric_account_id: id, tracked_item_id: item.id, platform: fullAccount.platform, level: 'info', message: `Poll Now: collected ${item.display_name} (${item.platform_identifier})` });
+    } else {
+      insertPollLog({ metric_account_id: id, tracked_item_id: item.id, platform: fullAccount.platform, level: 'error', message: `Poll Now: failed ${item.display_name} (${item.platform_identifier}) — ${result.error}` });
+    }
+    results.push({ item: item.display_name, success: result.success });
+    if (!result.success) allSuccess = false;
+  }
+
+  if (allSuccess) {
+    updatePollSuccess(id, fullAccount.polling_interval_min);
+  } else {
+    updatePollFailure(id);
+  }
+
+  res.json({ success: allSuccess, results });
 });
 
 export default router;

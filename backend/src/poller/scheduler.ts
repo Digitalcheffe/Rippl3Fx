@@ -5,6 +5,7 @@ import { collectGithub } from '../platforms/github';
 import { collectReddit } from '../platforms/reddit';
 import { collectGA4 } from '../platforms/ga4';
 import { collectBing } from '../platforms/bing';
+import { insertPollLog } from '../db/queries/logs';
 import type { GithubCredentials, RedditCredentials, GA4Credentials, BingCredentials } from '../types';
 
 async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promise<void> {
@@ -15,7 +16,9 @@ async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promi
   try {
     credentials = decryptCredentials(account.credentials);
   } catch (err: any) {
-    console.error(`[Scheduler] Failed to decrypt credentials for account ${account.id} (${account.display_name}): ${err.message}`);
+    const msg = `Failed to decrypt credentials: ${err.message}`;
+    console.error(`[Scheduler] ${msg}`);
+    insertPollLog({ metric_account_id: account.id, platform: account.platform, level: 'error', message: msg });
     updatePollFailure(account.id);
     return;
   }
@@ -24,29 +27,33 @@ async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promi
 
   for (const item of items) {
     try {
-      let success = false;
+      let result: { success: boolean; error?: string } = { success: false, error: 'Unknown platform' };
 
       switch (account.platform) {
         case 'github':
-          success = await collectGithub(item, credentials as GithubCredentials);
+          result = await collectGithub(item, credentials as GithubCredentials);
           break;
         case 'reddit':
-          success = await collectReddit(item, credentials as RedditCredentials);
+          result = await collectReddit(item, credentials as RedditCredentials);
           break;
         case 'ga4':
-          success = await collectGA4(item, credentials as GA4Credentials);
+          result = await collectGA4(item, credentials as GA4Credentials);
           break;
         case 'bing':
-          success = await collectBing(item, credentials as BingCredentials);
+          result = await collectBing(item, credentials as BingCredentials);
           break;
-        default:
-          console.error(`[Scheduler] Unknown platform: ${account.platform}`);
-          success = false;
       }
 
-      if (!success) allSuccess = false;
+      if (result.success) {
+        insertPollLog({ metric_account_id: account.id, tracked_item_id: item.id, platform: account.platform, level: 'info', message: `Collected ${item.display_name} (${item.platform_identifier})` });
+      } else {
+        insertPollLog({ metric_account_id: account.id, tracked_item_id: item.id, platform: account.platform, level: 'error', message: `Failed ${item.display_name} (${item.platform_identifier}): ${result.error}` });
+        allSuccess = false;
+      }
     } catch (err: any) {
-      console.error(`[Scheduler] Uncaught error collecting ${item.platform_identifier}: ${err.message}`);
+      const msg = `Uncaught error collecting ${item.display_name} (${item.platform_identifier}): ${err.message}`;
+      console.error(`[Scheduler] ${msg}`);
+      insertPollLog({ metric_account_id: account.id, tracked_item_id: item.id, platform: account.platform, level: 'error', message: msg });
       allSuccess = false;
     }
   }

@@ -22,11 +22,12 @@ export function createItem(accountId: number, platformIdentifier: string, displa
   return getItemById(result.lastInsertRowid as number)!;
 }
 
-export function updateItem(id: number, updates: { display_name?: string; is_active?: number }): TrackedItem | undefined {
+export function updateItem(id: number, updates: { display_name?: string; platform_identifier?: string; is_active?: number }): TrackedItem | undefined {
   const fields: string[] = [];
   const values: any[] = [];
 
   if (updates.display_name !== undefined) { fields.push('display_name = ?'); values.push(updates.display_name); }
+  if (updates.platform_identifier !== undefined) { fields.push('platform_identifier = ?'); values.push(updates.platform_identifier); }
   if (updates.is_active !== undefined) { fields.push('is_active = ?'); values.push(updates.is_active); }
 
   if (fields.length === 0) return getItemById(id);

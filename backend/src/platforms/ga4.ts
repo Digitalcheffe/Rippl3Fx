@@ -2,11 +2,10 @@ import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { insertGA4Snapshot } from '../db/queries/ga4';
 import type { GA4Credentials, TrackedItem } from '../types';
 
-export async function collectGA4(item: TrackedItem, credentials: GA4Credentials): Promise<boolean> {
+export async function collectGA4(item: TrackedItem, credentials: GA4Credentials): Promise<{ success: boolean; error?: string }> {
   const propertyId = item.platform_identifier;
   if (!propertyId) {
-    console.error('[GA4] Missing property ID in platform_identifier');
-    return false;
+    return { success: false, error: 'Missing property ID in platform_identifier' };
   }
 
   try {
@@ -51,9 +50,9 @@ export async function collectGA4(item: TrackedItem, credentials: GA4Credentials)
     });
 
     console.log(`[GA4] Collected snapshot for property ${propertyId}`);
-    return true;
+    return { success: true };
   } catch (err: any) {
     console.error(`[GA4] Failed to collect property ${propertyId}: ${err.message}`);
-    return false;
+    return { success: false, error: err.message };
   }
 }

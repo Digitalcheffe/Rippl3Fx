@@ -2,11 +2,10 @@ import { Octokit } from '@octokit/rest';
 import { insertGithubSnapshot } from '../db/queries/github';
 import type { GithubCredentials, TrackedItem } from '../types';
 
-export async function collectGithub(item: TrackedItem, credentials: GithubCredentials): Promise<boolean> {
+export async function collectGithub(item: TrackedItem, credentials: GithubCredentials): Promise<{ success: boolean; error?: string }> {
   const [owner, repo] = item.platform_identifier.split('/');
   if (!owner || !repo) {
-    console.error(`[GitHub] Invalid platform_identifier: ${item.platform_identifier}`);
-    return false;
+    return { success: false, error: `Invalid platform_identifier: ${item.platform_identifier} (expected owner/repo)` };
   }
 
   const octokit = new Octokit({ auth: credentials.personalAccessToken });
@@ -49,9 +48,9 @@ export async function collectGithub(item: TrackedItem, credentials: GithubCreden
     });
 
     console.log(`[GitHub] Collected snapshot for ${item.platform_identifier}`);
-    return true;
+    return { success: true };
   } catch (err: any) {
     console.error(`[GitHub] Failed to collect ${item.platform_identifier}: ${err.status || err.message}`);
-    return false;
+    return { success: false, error: `${err.status || ''} ${err.message}`.trim() };
   }
 }
