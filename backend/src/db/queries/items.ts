@@ -38,8 +38,17 @@ export function updateItem(id: number, updates: { display_name?: string; platfor
 }
 
 export function deleteItem(id: number): boolean {
-  // Remove tag associations first
+  // Remove all related data first
   db.prepare('DELETE FROM item_tags WHERE tracked_item_id = ?').run(id);
+  db.prepare('DELETE FROM poll_logs WHERE tracked_item_id = ?').run(id);
+  // Snapshots
+  for (const table of ['github_snapshots', 'reddit_snapshots', 'ga4_snapshots', 'bing_snapshots']) {
+    db.prepare(`DELETE FROM ${table} WHERE tracked_item_id = ?`).run(id);
+  }
+  // Rollups
+  for (const table of ['github_daily', 'github_weekly', 'github_monthly', 'reddit_daily', 'reddit_weekly', 'reddit_monthly', 'ga4_daily', 'ga4_weekly', 'ga4_monthly', 'bing_daily', 'bing_weekly', 'bing_monthly']) {
+    db.prepare(`DELETE FROM ${table} WHERE tracked_item_id = ?`).run(id);
+  }
   const result = db.prepare('DELETE FROM tracked_items WHERE id = ?').run(id);
   return result.changes > 0;
 }
