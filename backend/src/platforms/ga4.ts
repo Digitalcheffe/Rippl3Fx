@@ -3,10 +3,12 @@ import { insertGA4Snapshot } from '../db/queries/ga4';
 import type { GA4Credentials, TrackedItem } from '../types';
 
 export async function collectGA4(item: TrackedItem, credentials: GA4Credentials): Promise<{ success: boolean; error?: string }> {
-  const propertyId = item.platform_identifier;
+  const propertyId = credentials.propertyId;
   if (!propertyId) {
-    return { success: false, error: 'Missing property ID in platform_identifier' };
+    return { success: false, error: 'Missing propertyId in account credentials' };
   }
+
+  const pagePath = item.platform_identifier;
 
   try {
     const serviceAccount = JSON.parse(credentials.serviceAccountJson);
@@ -19,7 +21,8 @@ export async function collectGA4(item: TrackedItem, credentials: GA4Credentials)
       projectId: serviceAccount.project_id,
     });
 
-    const [response] = await client.runReport({
+    // Build report request — filter by page path if provided
+    const reportRequest: any = {
       property: `properties/${propertyId}`,
       dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
       metrics: [
@@ -28,12 +31,26 @@ export async function collectGA4(item: TrackedItem, credentials: GA4Credentials)
         { name: 'totalUsers' },
         { name: 'engagementRate' },
       ],
-    });
+    };
+
+    // If platform_identifier is a page path, filter to just that page
+    if (pagePath && pagePath !== propertyId && !pagePath.match(/^\d+$/)) {
+      reportRequest.dimensionFilter = {
+        filter: {
+          fieldName: 'pagePath',
+          stringFilter: {
+            matchType: 'EXACT',
+            value: pagePath,
+          },
+        },
+      };
+    }
+
+    const [response] = await client.runReport(reportRequest);
 
     const row = response.rows?.[0];
     const metrics = row?.metricValues;
 
-    // Compute actual date range
     const now = new Date();
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(now.getDate() - 7);
@@ -49,10 +66,10 @@ export async function collectGA4(item: TrackedItem, credentials: GA4Credentials)
       date_range_end: fmt(now),
     });
 
-    console.log(`[GA4] Collected snapshot for property ${propertyId}`);
+    console.log(`[GA4] Collected snapshot for ${pagePath || propertyId}`);
     return { success: true };
   } catch (err: any) {
-    console.error(`[GA4] Failed to collect property ${propertyId}: ${err.message}`);
+    console.error(`[GA4] Failed to collect ${pagePath || propertyId}: ${err.message}`);
     return { success: false, error: err.message };
   }
 }

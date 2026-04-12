@@ -7,7 +7,7 @@ interface PerformanceTrendItem {
   interestHistory: number[];
 }
 
-export default function PerformanceTrend({ items, width = 500, height = 80 }: { items: PerformanceTrendItem[]; width?: number; height?: number }) {
+export default function PerformanceTrend({ items, platform, width = 500, height = 80 }: { items: PerformanceTrendItem[]; platform?: string; width?: number; height?: number }) {
   // Average performance across all items per day
   const avgPerf = DAY_LABELS.map((_, di) => {
     const vals = items.map(i => i.interestHistory?.[di] ?? 0);
@@ -35,7 +35,7 @@ export default function PerformanceTrend({ items, width = 500, height = 80 }: { 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>Performance Trend</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, fontFamily: font }}>Cross-platform momentum over time</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, fontFamily: font }}>{platform ? `${platform} momentum over time` : 'Cross-platform momentum over time'}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 28, fontWeight: 900, color: tColor, fontFamily: font, lineHeight: 1 }}>{trend}</div>

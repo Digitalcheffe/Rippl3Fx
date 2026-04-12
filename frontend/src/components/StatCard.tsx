@@ -53,9 +53,11 @@ function LaneRow({ lane, data, compact = false }: LaneRowProps) {
         <div style={{ fontSize: compact ? 14 : 16, fontWeight: 900, color: C.text, fontFamily: font, lineHeight: 1.2, letterSpacing: -0.5 }}>{fmt(data.current)}</div>
       </div>
       <Sparkline data={data.history} color={color} width={compact ? 64 : 76} height={22} />
-      <div style={{ fontSize: 10, color: vc, fontWeight: 700, fontFamily: font, minWidth: 36, textAlign: 'right' }}>
-        {velArrow(data.velocity)} {velSign(data.velocity)}{fmt(Math.abs(data.velocity))}
-      </div>
+      {data.velocity !== 0 && (
+        <div style={{ fontSize: 10, color: vc, fontWeight: 700, fontFamily: font, minWidth: 36, textAlign: 'right' }}>
+          {velArrow(data.velocity)} {velSign(data.velocity)}{fmt(Math.abs(data.velocity))}
+        </div>
+      )}
     </div>
   );
 }

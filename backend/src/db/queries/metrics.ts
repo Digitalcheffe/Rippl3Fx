@@ -14,6 +14,27 @@ const DAILY_TABLES: Record<string, string> = {
   bing:   'bing_daily',
 };
 
+const WEEKLY_TABLES: Record<string, string> = {
+  github: 'github_weekly',
+  reddit: 'reddit_weekly',
+  ga4:    'ga4_weekly',
+  bing:   'bing_weekly',
+};
+
+const MONTHLY_TABLES: Record<string, string> = {
+  github: 'github_monthly',
+  reddit: 'reddit_monthly',
+  ga4:    'ga4_monthly',
+  bing:   'bing_monthly',
+};
+
+const RANGE_TABLES: Record<string, Record<string, string>> = {
+  hourly: SNAPSHOT_TABLES,
+  daily: DAILY_TABLES,
+  weekly: WEEKLY_TABLES,
+  monthly: MONTHLY_TABLES,
+};
+
 export interface DashboardItem {
   id: number;
   platform: string;
@@ -35,16 +56,44 @@ export function getLatestSnapshot(trackedItemId: number, platform: string): Reco
   return row ?? null;
 }
 
-export function getInterestHistory(trackedItemId: number, platform: string, days: number = 7): number[] {
-  const table = DAILY_TABLES[platform];
-  if (!table) return [];
+export function getInterestHistory(trackedItemId: number, platform: string, days: number = 7, range: string = 'daily'): number[] {
+  const rangeTables = RANGE_TABLES[range] || DAILY_TABLES;
+  const table = rangeTables[platform];
+  if (!table) return new Array(days).fill(0);
+
+  // For hourly (snapshots), use collected_at; for rollups, use period_start
+  const dateCol = range === 'hourly' ? 'collected_at' : 'period_start';
+  const scoreCol = range === 'hourly' ? '1' : 'interest_score'; // snapshots don't have interest_score
 
   const rows = db.prepare(
-    `SELECT interest_score FROM ${table}
+    `SELECT ${scoreCol} as interest_score FROM ${table}
      WHERE tracked_item_id = ?
-     ORDER BY period_start DESC
+     ORDER BY ${dateCol} DESC
      LIMIT ?`
   ).all(trackedItemId, days) as Array<{ interest_score: number }>;
+
+  // If no daily rollups yet, build history from snapshot counts per day
+  if (rows.length === 0) {
+    const snapshotTable = SNAPSHOT_TABLES[platform];
+    if (snapshotTable) {
+      const snapRows = db.prepare(
+        `SELECT DATE(collected_at) as day, COUNT(*) as cnt
+         FROM ${snapshotTable}
+         WHERE tracked_item_id = ?
+         GROUP BY DATE(collected_at)
+         ORDER BY day DESC
+         LIMIT ?`
+      ).all(trackedItemId, days) as Array<{ day: string; cnt: number }>;
+
+      if (snapRows.length > 0) {
+        // Use snapshot existence as a basic activity signal (scale to 0-100)
+        const maxCnt = Math.max(...snapRows.map(r => r.cnt), 1);
+        const scores = snapRows.map(r => Math.round((r.cnt / maxCnt) * 100)).reverse();
+        while (scores.length < days) scores.unshift(0);
+        return scores;
+      }
+    }
+  }
 
   // Reverse to oldest-first, pad with 0s to always return `days` values
   const scores = rows.map(r => r.interest_score).reverse();

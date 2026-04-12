@@ -48,7 +48,7 @@ export default function LaneSummary({ items }: { items: LaneSummaryItem[] }) {
             <div style={{ fontSize: 10, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>{lane}</div>
             <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
             <div style={{ fontSize: 11, color: vc, fontWeight: 700, fontFamily: font, marginTop: 4 }}>
-              {velArrow(d.velocity)} {velSign(d.velocity)}{fmt(Math.abs(d.velocity))} today
+              {d.velocity !== 0 ? `${velArrow(d.velocity)} ${velSign(d.velocity)}${fmt(Math.abs(d.velocity))} today` : 'No change yet'}
             </div>
           </div>
         );

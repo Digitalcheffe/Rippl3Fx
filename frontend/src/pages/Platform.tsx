@@ -3,9 +3,12 @@ import { useParams } from 'react-router-dom';
 import { C } from '../theme';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api/client';
 import EmptyState from '../components/EmptyState';
-import TagChip from '../components/TagChip';
+// TagChip used via StatCard
 import DiscoveryPanel from '../components/DiscoveryPanel';
 import AccountStats from '../components/AccountStats';
+import LaneSummary from '../components/LaneSummary';
+import PerformanceTrend from '../components/PerformanceTrend';
+import StatCard, { type StatCardItem } from '../components/StatCard';
 
 const font = "'DM Mono', monospace";
 
@@ -34,6 +37,19 @@ interface Tag {
   name: string;
 }
 
+function mapItemToLanes(item: any, plat: string): Record<string, { current: number; history: number[]; velocity: number }> {
+  const snap = item.latestSnapshot;
+  const hist = item.interestHistory || [0,0,0,0,0,0,0];
+  if (!snap) return { Reach: { current: 0, history: hist, velocity: 0 }, Interest: { current: 0, history: hist, velocity: 0 }, Engagement: { current: 0, history: hist, velocity: 0 } };
+  switch (plat) {
+    case 'github': return { Reach: { current: (snap.traffic_views||0)+(snap.traffic_uniques||0), history: hist, velocity: 0 }, Interest: { current: (snap.stars||0)+(snap.forks||0), history: hist, velocity: 0 }, Engagement: { current: (snap.clones||0)+(snap.clones_uniques||0), history: hist, velocity: 0 } };
+    case 'reddit': return { Reach: { current: snap.view_count||0, history: hist, velocity: 0 }, Interest: { current: snap.upvotes||0, history: hist, velocity: 0 }, Engagement: { current: snap.comment_count||0, history: hist, velocity: 0 } };
+    case 'ga4': return { Reach: { current: snap.pageviews||0, history: hist, velocity: 0 }, Interest: { current: snap.users||0, history: hist, velocity: 0 }, Engagement: { current: snap.sessions||0, history: hist, velocity: 0 } };
+    case 'bing': return { Reach: { current: snap.impressions||0, history: hist, velocity: 0 }, Interest: { current: snap.clicks||0, history: hist, velocity: 0 }, Engagement: { current: snap.ctr?Math.round(snap.ctr*1000)/10:0, history: hist, velocity: 0 } };
+    default: return { Reach: { current: 0, history: hist, velocity: 0 }, Interest: { current: 0, history: hist, velocity: 0 }, Engagement: { current: 0, history: hist, velocity: 0 } };
+  }
+}
+
 const inp: React.CSSProperties = {
   width: '100%', padding: '8px 12px', background: C.bgInput,
   border: `1px solid ${C.border}`, borderRadius: 7, color: C.text,
@@ -52,7 +68,9 @@ export default function Platform() {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<TrackedItem | null>(null);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dashboardItems, setDashboardItems] = useState<any[]>([]);
 
   // Load accounts for this platform
   useEffect(() => {
@@ -90,6 +108,29 @@ export default function Platform() {
     apiGet<Tag[]>('/tags').then(setAllTags).catch(() => {});
   }, []);
 
+  // Load dashboard data for platform-level metrics
+  useEffect(() => {
+    apiGet<{ items: any[] }>('/dashboard')
+      .then(data => {
+        const filtered = data.items.filter(i => i.platform === platform);
+        setDashboardItems(filtered);
+      })
+      .catch(() => {});
+  }, [platform, items]);
+
+  // Map dashboard items to lane data for LaneSummary
+  const laneSummaryItems = dashboardItems.map(item => {
+    const snap = item.latestSnapshot;
+    if (!snap) return { lanes: { Reach: { current: 0, velocity: 0 }, Interest: { current: 0, velocity: 0 }, Engagement: { current: 0, velocity: 0 } } };
+    switch (platform) {
+      case 'github': return { lanes: { Reach: { current: (snap.traffic_views || 0) + (snap.traffic_uniques || 0), velocity: 0 }, Interest: { current: (snap.stars || 0) + (snap.forks || 0), velocity: 0 }, Engagement: { current: (snap.clones || 0) + (snap.clones_uniques || 0), velocity: 0 } } };
+      case 'reddit': return { lanes: { Reach: { current: snap.view_count || 0, velocity: 0 }, Interest: { current: snap.upvotes || 0, velocity: 0 }, Engagement: { current: snap.comment_count || 0, velocity: 0 } } };
+      case 'ga4': return { lanes: { Reach: { current: snap.pageviews || 0, velocity: 0 }, Interest: { current: snap.users || 0, velocity: 0 }, Engagement: { current: snap.sessions || 0, velocity: 0 } } };
+      case 'bing': return { lanes: { Reach: { current: snap.impressions || 0, velocity: 0 }, Interest: { current: snap.clicks || 0, velocity: 0 }, Engagement: { current: snap.ctr ? Math.round(snap.ctr * 1000) / 10 : 0, velocity: 0 } } };
+      default: return { lanes: { Reach: { current: 0, velocity: 0 }, Interest: { current: 0, velocity: 0 }, Engagement: { current: 0, velocity: 0 } } };
+    }
+  });
+
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
 
@@ -120,18 +161,13 @@ export default function Platform() {
   };
 
   const handleRemoveItem = async (id: number) => {
-    if (!confirm('Remove this tracked item?')) return;
     await apiDelete(`/items/${id}`);
     setItems(prev => prev.filter(i => i.id !== id));
+    setConfirmRemoveId(null);
   };
 
-  const handleRemoveTag = async (itemId: number, tagId: number) => {
-    await apiDelete(`/tags/items/${itemId}/tags/${tagId}`);
-    setItemTags(prev => ({
-      ...prev,
-      [itemId]: (prev[itemId] || []).filter(t => t.id !== tagId),
-    }));
-  };
+  // Tag removal handled via tag management UI
+  void itemTags; // used in StatCard rendering
 
   if (loading) return null;
 
@@ -163,6 +199,14 @@ export default function Platform() {
 
           {/* Account Overview */}
           {activeAccountId && <AccountStats accountId={activeAccountId} platform={name} />}
+
+          {/* Platform-level lanes + performance */}
+          {laneSummaryItems.length > 0 && (
+            <>
+              <LaneSummary items={laneSummaryItems} />
+              <PerformanceTrend items={dashboardItems} platform={name} />
+            </>
+          )}
 
           {/* Discovery Panel */}
           {activeAccountId && (
@@ -223,58 +267,79 @@ export default function Platform() {
               No tracked items yet. Click "+ Add Item" to start tracking.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {items.map(item => (
-                <div key={item.id} style={{
-                  background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8,
-                  padding: '12px 14px', opacity: item.is_active ? 1 : 0.5,
-                }}>
-                  {editingItem?.id === item.id ? (
-                    <EditItemForm
-                      item={item}
-                      onSaved={() => {
-                        setEditingItem(null);
-                        if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
-                      }}
-                      onCancel={() => setEditingItem(null)}
-                    />
-                  ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: 12, color: C.text, fontWeight: 600, fontFamily: font }}>{item.display_name}</div>
-                        <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font, marginTop: 2 }}>{item.platform_identifier}</div>
-                        {(itemTags[item.id] || []).length > 0 && (
-                          <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
-                            {(itemTags[item.id] || []).map(tag => (
-                              <TagChip key={tag.id} name={tag.name} onRemove={() => handleRemoveTag(item.id, tag.id)} />
-                            ))}
-                          </div>
-                        )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
+              {items.map((item, i) => {
+                // Find matching dashboard item for this tracked item
+                const dashItem = dashboardItems.find(d => d.id === item.id);
+                const statItem: StatCardItem = dashItem ? {
+                  id: item.id,
+                  platform: name,
+                  display_name: item.display_name,
+                  tags: (itemTags[item.id] || []).map(t => t.name),
+                  lanes: mapItemToLanes(dashItem, platform || ''),
+                } : {
+                  id: item.id,
+                  platform: name,
+                  display_name: item.display_name,
+                  tags: (itemTags[item.id] || []).map(t => t.name),
+                  lanes: {
+                    Reach: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
+                    Interest: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
+                    Engagement: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
+                  },
+                };
+
+                return (
+                  <div key={item.id} style={{ opacity: item.is_active ? 1 : 0.5 }}>
+                    {editingItem?.id === item.id ? (
+                      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px' }}>
+                        <EditItemForm
+                          item={item}
+                          onSaved={() => {
+                            setEditingItem(null);
+                            if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
+                          }}
+                          onCancel={() => setEditingItem(null)}
+                        />
                       </div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <button onClick={() => setEditingItem(item)} style={{
-                          padding: '4px 10px', background: 'none',
-                          border: `1px solid ${C.border}`, borderRadius: 5,
-                          color: C.textMid, fontSize: 10, cursor: 'pointer', fontFamily: font,
-                        }}>Edit</button>
-                        <button onClick={() => handleToggleActive(item)} style={{
-                          padding: '4px 10px', background: 'none',
-                          border: `1px solid ${item.is_active ? C.up + '55' : C.border}`,
-                          borderRadius: 5, color: item.is_active ? C.up : C.textFaint,
-                          fontSize: 10, cursor: 'pointer', fontFamily: font,
-                        }}>
-                          {item.is_active ? 'Active' : 'Paused'}
-                        </button>
-                        <button onClick={() => handleRemoveItem(item.id)} style={{
-                          padding: '4px 10px', background: 'none',
-                          border: '1px solid #e8380d55', borderRadius: 5,
-                          color: '#e8380d', fontSize: 10, cursor: 'pointer', fontFamily: font,
-                        }}>Remove</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      <>
+                        <StatCard item={statItem} index={i} />
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                          <button onClick={() => setEditingItem(item)} style={{
+                            padding: '3px 8px', background: 'none', border: `1px solid ${C.border}`,
+                            borderRadius: 4, color: C.textMid, fontSize: 9, cursor: 'pointer', fontFamily: font,
+                          }}>Edit</button>
+                          <button onClick={() => handleToggleActive(item)} style={{
+                            padding: '3px 8px', background: 'none',
+                            border: `1px solid ${item.is_active ? C.up + '55' : C.border}`,
+                            borderRadius: 4, color: item.is_active ? C.up : C.textFaint,
+                            fontSize: 9, cursor: 'pointer', fontFamily: font,
+                          }}>{item.is_active ? 'Active' : 'Paused'}</button>
+                          {confirmRemoveId === item.id ? (
+                            <>
+                              <span style={{ fontSize: 9, color: '#c00', fontFamily: font }}>Sure?</span>
+                              <button onClick={() => handleRemoveItem(item.id)} style={{
+                                padding: '3px 8px', background: '#e8380d', border: 'none',
+                                borderRadius: 4, color: '#fff', fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: font,
+                              }}>Yes</button>
+                              <button onClick={() => setConfirmRemoveId(null)} style={{
+                                padding: '3px 8px', background: 'none', border: `1px solid ${C.border}`,
+                                borderRadius: 4, color: C.textMid, fontSize: 9, cursor: 'pointer', fontFamily: font,
+                              }}>No</button>
+                            </>
+                          ) : (
+                            <button onClick={() => setConfirmRemoveId(item.id)} style={{
+                              padding: '3px 8px', background: 'none', border: '1px solid #e8380d55',
+                              borderRadius: 4, color: '#e8380d', fontSize: 9, cursor: 'pointer', fontFamily: font,
+                            }}>Remove</button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

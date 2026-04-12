@@ -88,7 +88,7 @@ export default function LayeredInterestChart({ items, tag }: { items: ChartItem[
     return () => observer.disconnect();
   }, []);
 
-  if (items.length < 2) return null;
+  if (items.length === 0) return null;
 
   const platforms = [...new Set(items.map(i => i.platform))];
 

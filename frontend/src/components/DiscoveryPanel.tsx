@@ -170,10 +170,10 @@ export default function DiscoveryPanel({ accountId, platform, onItemTracked }: D
               }} />
             </div>
 
-            {allTags.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 10, color: C.textSoft, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Tags</label>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 10, color: C.textSoft, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Tags</label>
+              {allTags.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                   {allTags.map(tag => {
                     const selected = selectedTags.includes(tag.id);
                     return (
@@ -188,8 +188,12 @@ export default function DiscoveryPanel({ accountId, platform, onItemTracked }: D
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+              <NewTagInput onCreated={(tag) => {
+                setAllTags(prev => [...prev, tag]);
+                setSelectedTags(prev => [...prev, tag.id]);
+              }} />
+            </div>
 
             <button onClick={() => handleTagAndTrack(tagModalItem)} style={{
               padding: '8px 20px', background: platformColor, border: 'none', borderRadius: 7,
@@ -228,6 +232,43 @@ function ManualEntry({ platformColor, onTrack }: { platformColor: string; onTrac
       >
         Tag & Track
       </button>
+    </div>
+  );
+}
+
+// ── New Tag Input ──
+function NewTagInput({ onCreated }: { onCreated: (tag: Tag) => void }) {
+  const [value, setValue] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const handleCreate = async () => {
+    if (!value.trim() || creating) return;
+    setCreating(true);
+    try {
+      const tag = await apiPost<Tag>('/tags', { name: value.trim() });
+      onCreated(tag);
+      setValue('');
+    } catch { /* tag may already exist */ }
+    setCreating(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <input
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
+        placeholder="Create new tag..."
+        style={{
+          flex: 1, padding: '5px 10px', background: C.bgInput, border: `1px solid ${C.border}`,
+          borderRadius: 5, color: C.text, fontSize: 11, fontFamily: font, outline: 'none',
+        }}
+      />
+      <button onClick={handleCreate} disabled={!value.trim() || creating} style={{
+        padding: '5px 10px', background: C.accent, border: 'none', borderRadius: 5,
+        color: '#fff', fontSize: 10, fontWeight: 700, cursor: value.trim() ? 'pointer' : 'default',
+        fontFamily: font, opacity: value.trim() ? 1 : 0.5,
+      }}>+ Tag</button>
     </div>
   );
 }
