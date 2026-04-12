@@ -28,7 +28,7 @@ export async function collectReddit(item: TrackedItem, credentials: RedditCreden
       userAgent: 'Rippl3FX/1.0',
       clientId: credentials.clientId,
       clientSecret: credentials.clientSecret,
-      username: credentials.username,
+      username: credentials.username.replace(/^u\//, ''),
       password: credentials.password,
     });
 

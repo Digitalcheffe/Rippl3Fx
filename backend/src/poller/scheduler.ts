@@ -6,6 +6,7 @@ import { collectReddit } from '../platforms/reddit';
 import { collectGA4 } from '../platforms/ga4';
 import { collectBing } from '../platforms/bing';
 import { insertPollLog } from '../db/queries/logs';
+import { getTimezone } from '../utils/timezone';
 import type { GithubCredentials, RedditCredentials, GA4Credentials, BingCredentials } from '../types';
 
 async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promise<void> {
@@ -86,44 +87,55 @@ async function tick(): Promise<void> {
 }
 
 export function start(): void {
-  // Run every minute
+  const tz = getTimezone();
+  const cronOpts = { timezone: tz };
+
+  // Polling tick — every minute (timezone doesn't matter here)
   cron.schedule('* * * * *', () => {
     tick().catch(err => {
       console.error(`[Scheduler] Tick failed: ${err.message}`);
     });
   });
 
-  // Daily rollup at 23:55
-  cron.schedule('55 23 * * *', () => {
+  // Daily rollup at midnight
+  cron.schedule('0 0 * * *', () => {
     try {
       const { runDailyRollup } = require('../rollup/daily');
       runDailyRollup();
     } catch (err: any) {
       console.error(`[Scheduler] Daily rollup failed: ${err.message}`);
     }
-  });
+  }, cronOpts);
 
-  // Weekly rollup at Sunday 23:58
-  cron.schedule('58 23 * * 0', () => {
+  // Weekly rollup — Monday 00:05
+  cron.schedule('5 0 * * 1', () => {
     try {
       const { runWeeklyRollup } = require('../rollup/weekly');
       runWeeklyRollup();
     } catch (err: any) {
       console.error(`[Scheduler] Weekly rollup failed: ${err.message}`);
     }
-  });
+  }, cronOpts);
 
-  // Monthly rollup at 23:59 on 28th–31st (only runs if tomorrow is a new month)
-  cron.schedule('59 23 28-31 * *', () => {
+  // Monthly rollup — 1st of month at 00:10
+  cron.schedule('10 0 1 * *', () => {
     try {
-      const { isTomorrowNewMonth, runMonthlyRollup } = require('../rollup/monthly');
-      if (isTomorrowNewMonth()) {
-        runMonthlyRollup();
-      }
+      const { runMonthlyRollup } = require('../rollup/monthly');
+      runMonthlyRollup();
     } catch (err: any) {
       console.error(`[Scheduler] Monthly rollup failed: ${err.message}`);
     }
-  });
+  }, cronOpts);
 
-  console.log('[Scheduler] Started — polling every minute, rollups at 23:55/23:58/23:59');
+  // Hourly purge — 00:15 daily (after daily rollup)
+  cron.schedule('15 0 * * *', () => {
+    try {
+      const { runHourlyPurge } = require('../rollup/hourly-purge');
+      runHourlyPurge();
+    } catch (err: any) {
+      console.error(`[Scheduler] Hourly purge failed: ${err.message}`);
+    }
+  }, cronOpts);
+
+  console.log(`[Scheduler] Started — timezone: ${tz}, rollups at midnight, polling every minute`);
 }

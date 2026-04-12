@@ -4,7 +4,8 @@ import { C } from '../theme';
 const font = "'DM Mono', monospace";
 const DAY_LABELS = ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Today'];
 
-const PLATFORM_ORDER = ['Reddit', 'GitHub', 'GA4', 'Bing'];
+const PLATFORM_ORDER = ['reddit', 'github', 'ga4', 'bing'];
+const PLATFORM_DISPLAY: Record<string, string> = { reddit: 'Reddit', github: 'GitHub', ga4: 'GA4', bing: 'Bing' };
 
 interface ChartItem {
   platform: string;
@@ -56,7 +57,8 @@ function LayeredInterestChartSVG({ items, width, height }: { items: ChartItem[];
       {/* Platform areas + lines */}
       {PLATFORM_ORDER.filter(p => platformData[p]).map(platform => {
         const data = platformData[platform];
-        const color = (C[platform as keyof typeof C] || C.accent) as string;
+        const displayKey = PLATFORM_DISPLAY[platform] || platform;
+        const color = (C[displayKey as keyof typeof C] || C.accent) as string;
         const pts = data.map((v, i) => [toX(i), toY(v)]);
         const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
         const area = `${line} L${toX(6)},${padT + cH} L${toX(0)},${padT + cH} Z`;
@@ -101,11 +103,12 @@ export default function LayeredInterestChart({ items, tag }: { items: ChartItem[
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           {platforms.map(p => {
-            const color = (C[p as keyof typeof C] || C.accent) as string;
+            const displayKey = PLATFORM_DISPLAY[p] || p;
+            const color = (C[displayKey as keyof typeof C] || C.accent) as string;
             return (
               <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <div style={{ width: 12, height: 2, background: color, borderRadius: 1 }} />
-                <span style={{ fontSize: 9, color: C.textFaint, fontFamily: font }}>{p}</span>
+                <span style={{ fontSize: 9, color: C.textFaint, fontFamily: font }}>{displayKey}</span>
               </div>
             );
           })}

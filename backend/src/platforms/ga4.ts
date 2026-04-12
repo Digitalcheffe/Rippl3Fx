@@ -1,5 +1,6 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { insertGA4Snapshot } from '../db/queries/ga4';
+import { getLocalDate } from '../utils/timezone';
 import type { GA4Credentials, TrackedItem } from '../types';
 
 export async function collectGA4(item: TrackedItem, credentials: GA4Credentials): Promise<{ success: boolean; error?: string }> {
@@ -24,7 +25,7 @@ export async function collectGA4(item: TrackedItem, credentials: GA4Credentials)
     // Build report request — filter by page path if provided
     const reportRequest: any = {
       property: `properties/${propertyId}`,
-      dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
+      dateRanges: [{ startDate: 'today', endDate: 'today' }],
       metrics: [
         { name: 'sessions' },
         { name: 'screenPageViews' },
@@ -51,10 +52,7 @@ export async function collectGA4(item: TrackedItem, credentials: GA4Credentials)
     const row = response.rows?.[0];
     const metrics = row?.metricValues;
 
-    const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(now.getDate() - 7);
-    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const today = getLocalDate();
 
     insertGA4Snapshot({
       tracked_item_id: item.id,
@@ -62,8 +60,8 @@ export async function collectGA4(item: TrackedItem, credentials: GA4Credentials)
       pageviews: metrics?.[1]?.value ? parseInt(metrics[1].value, 10) : null,
       users: metrics?.[2]?.value ? parseInt(metrics[2].value, 10) : null,
       engagement_rate: metrics?.[3]?.value ? parseFloat(metrics[3].value) : null,
-      date_range_start: fmt(sevenDaysAgo),
-      date_range_end: fmt(now),
+      date_range_start: today,
+      date_range_end: today,
     });
 
     console.log(`[GA4] Collected snapshot for ${pagePath || propertyId}`);
