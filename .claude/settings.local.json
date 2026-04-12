@@ -5,7 +5,21 @@
       "Bash(gh issue create --title '[Foundation] Frontend auth — setup page, login page, TOTP prompt' --label foundation,frontend,auth --body ':*)",
       "Bash(gh label:*)",
       "Bash(npm install:*)",
-      "Bash(node -e \"require\\('better-sqlite3'\\)\")"
+      "Bash(node -e \"require\\('better-sqlite3'\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(node dist/index.js)",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(kill %1)",
+      "Bash(curl -s -v -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"testpass123\"}')",
+      "Bash(mkdir -p data)",
+      "Bash(rm -f data/rippl3fx.db)",
+      "Bash(node -e ':*)",
+      "Bash(curl -s http://localhost:3000/api/auth/status)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/setup -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"password123\"}')",
+      "Bash(gh pr create --title 'Issue 18: Frontend scaffold' --body ':*)",
+      "Bash(gh pr create --title 'Issue 19: Settings page' --body ':*)"
     ]
   }
 }

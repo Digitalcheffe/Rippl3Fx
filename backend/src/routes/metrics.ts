@@ -9,14 +9,15 @@ import {
 
 const router = Router();
 
-// GET /api/dashboard?tag=NORA
+// GET /api/dashboard?tag=NORA&range=daily
 router.get('/dashboard', (req: Request, res: Response) => {
   const tagFilter = req.query.tag as string | undefined;
+  const range = (req.query.range as string) || 'daily';
   const trackedItems = getTrackedItemsWithPlatform(tagFilter);
 
   const items: DashboardItem[] = trackedItems.map(ti => {
     const latestSnapshot = getLatestSnapshot(ti.id, ti.platform);
-    const interestHistory = getInterestHistory(ti.id, ti.platform, 7);
+    const interestHistory = getInterestHistory(ti.id, ti.platform, 7, range);
     const currentInterestScore = interestHistory[interestHistory.length - 1] ?? 0;
 
     // Trend: compare last 2 days
