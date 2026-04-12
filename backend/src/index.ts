@@ -1,18 +1,31 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { migrate } from './db/migrate';
+import { authMiddleware } from './middleware/auth';
+import authRouter from './routes/auth';
+
+// Run migrations before anything else
+migrate();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 
-// Health check
+// Health check (no auth)
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Auth routes (no auth required)
+app.use('/api/auth', authRouter);
+
+// JWT middleware for all other /api routes
+app.use(authMiddleware);
 
 // Serve frontend static files
 const distPath = path.join(__dirname, '..', 'dist');
@@ -22,9 +35,6 @@ app.use(express.static(distPath));
 app.get('*', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
-
-// Run migrations before starting
-migrate();
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Rippl3FX running on port ${PORT}`);
