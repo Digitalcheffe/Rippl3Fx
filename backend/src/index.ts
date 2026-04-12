@@ -5,6 +5,8 @@ import path from 'path';
 import { migrate } from './db/migrate';
 import { authMiddleware } from './middleware/auth';
 import authRouter from './routes/auth';
+import accountsRouter from './routes/accounts';
+import itemsRouter from './routes/items';
 import * as scheduler from './poller/scheduler';
 
 // Run migrations before anything else
@@ -30,6 +32,10 @@ app.use('/api/auth', authRouter);
 
 // JWT middleware for all other /api routes
 app.use(authMiddleware);
+
+// Protected routes
+app.use('/api/accounts', accountsRouter);
+app.use('/api/items', itemsRouter);
 
 // Serve frontend static files
 const distPath = path.join(__dirname, '..', 'dist');
