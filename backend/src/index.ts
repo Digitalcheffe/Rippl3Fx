@@ -5,9 +5,13 @@ import path from 'path';
 import { migrate } from './db/migrate';
 import { authMiddleware } from './middleware/auth';
 import authRouter from './routes/auth';
+import * as scheduler from './poller/scheduler';
 
 // Run migrations before anything else
 migrate();
+
+// Start polling scheduler
+scheduler.start();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
