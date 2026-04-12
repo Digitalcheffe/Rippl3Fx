@@ -8,6 +8,7 @@ import authRouter from './routes/auth';
 import accountsRouter from './routes/accounts';
 import itemsRouter from './routes/items';
 import tagsRouter from './routes/tags';
+import metricsRouter from './routes/metrics';
 import * as scheduler from './poller/scheduler';
 
 // Run migrations before anything else
@@ -38,6 +39,7 @@ app.use(authMiddleware);
 app.use('/api/accounts', accountsRouter);
 app.use('/api/items', itemsRouter);
 app.use('/api/tags', tagsRouter);
+app.use('/api', metricsRouter);
 
 // Serve frontend static files
 const distPath = path.join(__dirname, '..', 'dist');
