@@ -1,0 +1,15 @@
+services:
+  rippl3fx:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - rippl3fx-data:/app/data
+    environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3000
+      - DB_PATH=/app/data/rippl3fx.db
+
+volumes:
+  rippl3fx-data:
