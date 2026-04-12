@@ -104,18 +104,31 @@ router.get('/:id/discover', async (req: Request, res: Response) => {
 
       case 'bing': {
         const creds = credentials as BingCredentials;
-        // Try to list sites from Bing Webmaster API
+        // Fetch top pages with search stats from Bing Webmaster API
         try {
-          const { data } = await axios.get('https://ssl.bing.com/webmaster/api.svc/json/GetUserSites', {
-            params: { apikey: creds.apiKey },
+          const { data } = await axios.get('https://ssl.bing.com/webmaster/api.svc/json/GetPageStats', {
+            params: { apikey: creds.apiKey, siteUrl: creds.siteUrl },
           });
-          const sites = data?.d ?? data;
-          if (Array.isArray(sites)) {
-            items = sites.map((s: any) => ({
-              name: s.Url || s.url,
-              identifier: s.Url || s.url,
-              description: 'Verified site',
-            }));
+          const entries = data?.d ?? data;
+          if (Array.isArray(entries) && entries.length > 0) {
+            // Aggregate by page URL (entries are daily rows)
+            const pageMap = new Map<string, { impressions: number; clicks: number }>();
+            for (const entry of entries) {
+              const url = entry.Query || entry.query || entry.Url || entry.url;
+              if (!url) continue;
+              const existing = pageMap.get(url) || { impressions: 0, clicks: 0 };
+              existing.impressions += entry.Impressions ?? 0;
+              existing.clicks += entry.Clicks ?? 0;
+              pageMap.set(url, existing);
+            }
+            items = Array.from(pageMap.entries())
+              .sort((a, b) => b[1].impressions - a[1].impressions)
+              .slice(0, 30)
+              .map(([url, stats]) => ({
+                name: '/' + url.replace(/^https?:\/\/[^/]+\/?/, ''),
+                identifier: url,
+                description: `${fmtNum(stats.impressions)} impressions · ${fmtNum(stats.clicks)} clicks`,
+              }));
           }
         } catch {
           // Fallback to credential siteUrl

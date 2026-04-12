@@ -16,6 +16,8 @@ Open `http://localhost:3000` and create your account on first run.
 
 Create a Reddit app to get API credentials.
 
+**If you sign in to Reddit with Google/Apple:** Reddit's API requires a username and password. To add a password to your account, go to https://www.reddit.com/password, enter your Reddit email, and use the reset link to create a password. Your Google SSO login will continue to work alongside the new password.
+
 1. Go to https://www.reddit.com/prefs/apps
 2. Click **"create another app..."** at the bottom
 3. Fill in:
@@ -32,17 +34,24 @@ Create a Reddit app to get API credentials.
 
 ### GitHub
 
-Create a Personal Access Token for API access.
+Create a Personal Access Token (classic) for API access. Rippl3FX reads repo stats (stars, forks, issues), traffic views/uniques, and clone counts. Traffic and clone data require **push access** to the repo — this only works for your own repos.
+
+> **Why classic?** Fine-grained tokens don't support the Traffic API endpoints (`/repos/{owner}/{repo}/traffic/*`) that Rippl3FX needs. You must use a classic token.
 
 1. Go to https://github.com/settings/tokens
 2. Click **Generate new token** → **Generate new token (classic)**
-3. Name it `Rippl3FX`
-4. Select scopes:
-   - `repo` — needed for traffic and clone data on your own repos
-   - (Public repo stats like stars and forks work with any scope)
-5. Click **Generate token**
-6. Copy the token (starts with `ghp_`)
-7. In Rippl3FX Settings → Accounts → Connect GitHub, paste the token
+3. You may be prompted for your password or 2FA code
+4. Fill in:
+   - **Note:** `Rippl3FX`
+   - **Expiration:** choose a duration (you'll need to regenerate and update in Rippl3FX when it expires)
+5. Select scopes:
+   - **`repo`** — required for traffic views, traffic uniques, clone counts, and private repo access
+   - That's the only scope needed. Public stats (stars, forks) work with any scope, but traffic/clone data requires `repo`.
+6. Scroll down and click **Generate token**
+7. **Copy the token immediately** — it starts with `ghp_` and is only shown once. If you lose it, you'll need to generate a new one.
+8. In Rippl3FX, go to Settings → Platform Accounts → **+ Add Account**
+9. Select **GitHub**, give it a display name, and paste the token into the **Personal Access Token** field
+10. Click **Connect**
 
 ### GA4 (Google Analytics 4)
 

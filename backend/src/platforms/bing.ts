@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { insertBingSnapshot } from '../db/queries/bing';
+import { getLocalDate } from '../utils/timezone';
 import type { BingCredentials, TrackedItem } from '../types';
 
 const BING_API_BASE = 'https://ssl.bing.com/webmaster/api.svc/json';
@@ -12,9 +13,8 @@ export async function collectBing(item: TrackedItem, credentials: BingCredential
 
   try {
     const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(now.getDate() - 7);
-    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const today = getLocalDate(now);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
 
     const response = await axios.get(`${BING_API_BASE}/GetPageStats`, {
       params: {
@@ -51,8 +51,8 @@ export async function collectBing(item: TrackedItem, credentials: BingCredential
       clicks: totalClicks,
       ctr,
       avg_rank: avgRank,
-      date_range_start: fmt(sevenDaysAgo),
-      date_range_end: fmt(now),
+      date_range_start: getLocalDate(sevenDaysAgo),
+      date_range_end: today,
     });
 
     console.log(`[Bing] Collected snapshot for ${item.platform_identifier}`);

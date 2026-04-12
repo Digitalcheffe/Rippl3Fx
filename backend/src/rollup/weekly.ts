@@ -2,35 +2,34 @@ import db from '../db/connection';
 import {
   insertGithubWeekly, insertRedditWeekly, insertGA4Weekly, insertBingWeekly,
 } from '../db/queries/rollup';
+import { getLocalDate } from '../utils/timezone';
 
 /**
- * Get Monday of the week containing the given date.
+ * Get Monday of the week containing the given date (timezone-aware).
  */
-function getMonday(date: Date): Date {
-  const d = new Date(date);
+function getMonday(date: Date): string {
+  // Get the local date string, then work with that
+  const localStr = getLocalDate(date);
+  const d = new Date(localStr + 'T12:00:00'); // noon to avoid DST edge cases
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day; // Sunday → previous Monday
   d.setDate(d.getDate() + diff);
-  return d;
+  return getLocalDate(d);
 }
 
-function fmt(d: Date): string {
-  return d.toISOString().split('T')[0];
+function getPreviousMonday(): string {
+  const now = new Date();
+  // Go back 7 days to get into last week, then find that Monday
+  const lastWeek = new Date(now.getTime() - 7 * 86_400_000);
+  return getMonday(lastWeek);
 }
 
 export function runWeeklyRollup(weekStartDate?: string): void {
-  let monday: Date;
-  if (weekStartDate) {
-    monday = new Date(weekStartDate);
-  } else {
-    monday = getMonday(new Date());
-  }
-
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-
-  const periodStart = fmt(monday);
-  const periodEnd = fmt(sunday);
+  const periodStart = weekStartDate || getPreviousMonday();
+  // Sunday = Monday + 6 days
+  const mondayDate = new Date(periodStart + 'T12:00:00');
+  const sundayDate = new Date(mondayDate.getTime() + 6 * 86_400_000);
+  const periodEnd = getLocalDate(sundayDate);
 
   console.log(`[Rollup] Running weekly rollup for ${periodStart} to ${periodEnd}`);
 

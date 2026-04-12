@@ -2,28 +2,28 @@ import db from '../db/connection';
 import {
   insertGithubMonthly, insertRedditMonthly, insertGA4Monthly, insertBingMonthly,
 } from '../db/queries/rollup';
-
-function fmt(d: Date): string {
-  return d.toISOString().split('T')[0];
-}
+import { getLocalYearMonth } from '../utils/timezone';
 
 function getLastDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
 /**
- * Check if tomorrow is a new month (used by scheduler to decide if rollup should run).
+ * Runs on the 1st of each month — rolls up the previous month's data.
  */
-export function isTomorrowNewMonth(): boolean {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.getDate() === 1;
-}
-
 export function runMonthlyRollup(year?: number, month?: number): void {
-  const now = new Date();
-  const y = year ?? now.getFullYear();
-  const m = month ?? (now.getMonth() + 1); // 1-indexed
+  let y: number, m: number;
+
+  if (year != null && month != null) {
+    y = year;
+    m = month;
+  } else {
+    // Running on the 1st — roll up previous month
+    const now = getLocalYearMonth();
+    m = now.month - 1;
+    y = now.year;
+    if (m < 1) { m = 12; y--; }
+  }
 
   const periodStart = `${y}-${String(m).padStart(2, '0')}-01`;
   const lastDay = getLastDayOfMonth(y, m);
