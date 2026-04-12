@@ -4,11 +4,10 @@ import type { BingCredentials, TrackedItem } from '../types';
 
 const BING_API_BASE = 'https://ssl.bing.com/webmaster/api.svc/json';
 
-export async function collectBing(item: TrackedItem, credentials: BingCredentials): Promise<boolean> {
+export async function collectBing(item: TrackedItem, credentials: BingCredentials): Promise<{ success: boolean; error?: string }> {
   const siteUrl = credentials.siteUrl;
   if (!siteUrl) {
-    console.error('[Bing] Missing siteUrl in credentials');
-    return false;
+    return { success: false, error: 'Missing siteUrl in credentials' };
   }
 
   try {
@@ -57,14 +56,13 @@ export async function collectBing(item: TrackedItem, credentials: BingCredential
     });
 
     console.log(`[Bing] Collected snapshot for ${item.platform_identifier}`);
-    return true;
+    return { success: true };
   } catch (err: any) {
     const status = err.response?.status;
-    if (status === 401 || status === 403) {
-      console.error(`[Bing] Auth failed for ${siteUrl}: ${status}`);
-    } else {
-      console.error(`[Bing] Failed to collect ${item.platform_identifier}: ${err.message}`);
-    }
-    return false;
+    const msg = status === 401 || status === 403
+      ? `Auth failed (${status}) for ${siteUrl}`
+      : err.message;
+    console.error(`[Bing] ${msg}`);
+    return { success: false, error: msg };
   }
 }

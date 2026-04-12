@@ -57,9 +57,8 @@ export default function Settings() {
   const [tab, setTab] = useState('profile');
   const tabs = [
     { k: 'profile', l: 'Profile' },
-    { k: 'password', l: 'Password' },
-    { k: 'totp', l: '2FA' },
-    { k: 'accounts', l: 'Accounts' },
+    { k: 'accounts', l: 'Platform Accounts' },
+    { k: 'logs', l: 'Poll Logs' },
   ];
 
   return (
@@ -67,7 +66,7 @@ export default function Settings() {
       <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Settings</div>
       <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font, marginBottom: 20 }}>Settings</h1>
 
-      <div style={{ background: C.bgCard, border: `1px solid ${C.borderMid}`, borderRadius: 14, maxWidth: 540, overflow: 'hidden' }}>
+      <div style={{ background: C.bgCard, border: `1px solid ${C.borderMid}`, borderRadius: 14, overflow: 'hidden' }}>
         {/* Tab bar */}
         <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, background: C.bg }}>
           {tabs.map(t => (
@@ -84,10 +83,17 @@ export default function Settings() {
         </div>
 
         <div style={{ padding: 22 }}>
-          {tab === 'profile' && <ProfileTab user={user} onUpdate={checkAuth} />}
-          {tab === 'password' && <PasswordTab />}
-          {tab === 'totp' && <TOTPTab user={user} onUpdate={checkAuth} />}
+          {tab === 'profile' && (
+            <>
+              <ProfileTab user={user} onUpdate={checkAuth} />
+              <div style={{ borderTop: `1px solid ${C.border}`, margin: '20px 0' }} />
+              <PasswordTab />
+              <div style={{ borderTop: `1px solid ${C.border}`, margin: '20px 0' }} />
+              <TOTPTab user={user} onUpdate={checkAuth} />
+            </>
+          )}
           {tab === 'accounts' && <AccountsTab />}
+          {tab === 'logs' && <LogsTab />}
         </div>
       </div>
     </div>
@@ -412,6 +418,102 @@ function AccountModal({ account, defaultPlatform, onClose, onSaved }: { account:
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Logs Tab ──
+interface PollLog {
+  id: number;
+  metric_account_id: number;
+  tracked_item_id: number | null;
+  platform: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  created_at: string;
+}
+
+function LogsTab() {
+  const [logs, setLogs] = useState<PollLog[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+
+  const loadLogs = async (p: number) => {
+    setLoading(true);
+    try {
+      const data = await apiGet<{ logs: PollLog[]; totalPages: number }>(`/logs?page=${p}&limit=100`);
+      setLogs(data.logs);
+      setTotalPages(data.totalPages);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadLogs(page); }, [page]);
+
+  const levelColor = (level: string) => {
+    if (level === 'error') return '#c00';
+    if (level === 'warn') return C.GA4;
+    return C.up;
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>
+          Page {page} of {totalPages}
+        </div>
+        <button onClick={() => loadLogs(page)} style={{
+          padding: '4px 12px', background: C.bgInput, border: `1px solid ${C.border}`,
+          borderRadius: 5, color: C.textMid, fontSize: 11, cursor: 'pointer', fontFamily: font,
+        }}>Refresh</button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '20px 0', color: C.textSoft, fontSize: 12, fontFamily: font }}>Loading...</div>
+      ) : logs.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 0', color: C.textSoft, fontSize: 13, fontFamily: font }}>
+          No poll logs yet. Logs appear after polling runs.
+        </div>
+      ) : (
+        <>
+          {logs.map(log => (
+            <div key={log.id} style={{
+              background: log.level === 'error' ? '#ffeaea' : C.bg,
+              border: `1px solid ${log.level === 'error' ? '#ffaaaa' : C.border}`,
+              borderRadius: 6, padding: '8px 12px', fontSize: 11, fontFamily: font,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ color: levelColor(log.level), fontWeight: 700, textTransform: 'uppercase', fontSize: 9, letterSpacing: 0.5 }}>{log.level}</span>
+                  <span style={{ color: C[log.platform.charAt(0).toUpperCase() + log.platform.slice(1) as keyof typeof C] || C.textMid, fontWeight: 600, fontSize: 10 }}>
+                    {log.platform.toUpperCase()}
+                  </span>
+                </div>
+                <span style={{ color: C.textFaint, fontSize: 9 }}>
+                  {new Date(log.created_at + 'Z').toLocaleString()}
+                </span>
+              </div>
+              <div style={{ color: C.text, lineHeight: 1.4 }}>{log.message}</div>
+            </div>
+          ))}
+
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{
+                padding: '4px 12px', background: C.bgInput, border: `1px solid ${C.border}`,
+                borderRadius: 5, color: page === 1 ? C.textFaint : C.textMid, fontSize: 11,
+                cursor: page === 1 ? 'default' : 'pointer', fontFamily: font,
+              }}>Prev</button>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{
+                padding: '4px 12px', background: C.bgInput, border: `1px solid ${C.border}`,
+                borderRadius: 5, color: page === totalPages ? C.textFaint : C.textMid, fontSize: 11,
+                cursor: page === totalPages ? 'default' : 'pointer', fontFamily: font,
+              }}>Next</button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

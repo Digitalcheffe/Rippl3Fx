@@ -17,11 +17,10 @@ function extractPostId(platformIdentifier: string): string | null {
   return null;
 }
 
-export async function collectReddit(item: TrackedItem, credentials: RedditCredentials): Promise<boolean> {
+export async function collectReddit(item: TrackedItem, credentials: RedditCredentials): Promise<{ success: boolean; error?: string }> {
   const postId = extractPostId(item.platform_identifier);
   if (!postId) {
-    console.error(`[Reddit] Cannot extract post ID from: ${item.platform_identifier}`);
-    return false;
+    return { success: false, error: `Cannot extract post ID from: ${item.platform_identifier}` };
   }
 
   try {
@@ -37,8 +36,7 @@ export async function collectReddit(item: TrackedItem, credentials: RedditCreden
 
     // Check for removed/deleted posts
     if (submission.removed || (submission as any).removed_by_category) {
-      console.warn(`[Reddit] Post ${postId} has been removed`);
-      return false;
+      return { success: false, error: `Post ${postId} has been removed` };
     }
 
     insertRedditSnapshot({
@@ -50,9 +48,9 @@ export async function collectReddit(item: TrackedItem, credentials: RedditCreden
     });
 
     console.log(`[Reddit] Collected snapshot for ${item.platform_identifier}`);
-    return true;
+    return { success: true };
   } catch (err: any) {
     console.error(`[Reddit] Failed to collect ${item.platform_identifier}: ${err.message}`);
-    return false;
+    return { success: false, error: err.message };
   }
 }

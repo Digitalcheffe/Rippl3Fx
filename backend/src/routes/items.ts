@@ -68,8 +68,16 @@ router.put('/:id', (req: Request, res: Response) => {
     return;
   }
 
-  const { display_name, is_active } = req.body;
+  const { display_name, platform_identifier, is_active } = req.body;
   const updates: Record<string, any> = {};
+
+  if (platform_identifier !== undefined) {
+    if (typeof platform_identifier !== 'string' || !platform_identifier) {
+      res.status(400).json({ error: 'platform_identifier must be a non-empty string' });
+      return;
+    }
+    updates.platform_identifier = platform_identifier;
+  }
 
   if (display_name !== undefined) {
     if (typeof display_name !== 'string' || !display_name) {
