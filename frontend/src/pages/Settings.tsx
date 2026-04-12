@@ -263,6 +263,7 @@ function AccountsTab() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
+  const [defaultPlatform, setDefaultPlatform] = useState('github');
 
   const loadAccounts = async () => {
     try {
@@ -305,7 +306,7 @@ function AccountsTab() {
       {PLATFORMS.filter(p => !connectedPlatforms.includes(p.toLowerCase())).map(p => (
         <div key={p} style={{ background: C.bg, border: `1px dashed ${C.borderMid}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: C.textFaint, fontFamily: font }}>{p} — not connected</span>
-          <button onClick={() => { setEditAccount(null); setShowModal(true); }} style={{
+          <button onClick={() => { setEditAccount(null); setDefaultPlatform(p.toLowerCase()); setShowModal(true); }} style={{
             padding: '4px 12px', background: (C[p as keyof typeof C] || C.accent) + '15',
             border: `1px solid ${(C[p as keyof typeof C] || C.accent)}40`,
             borderRadius: 5, color: C[p as keyof typeof C] || C.accent,
@@ -314,11 +315,12 @@ function AccountsTab() {
         </div>
       ))}
 
-      <button onClick={() => { setEditAccount(null); setShowModal(true); }} style={{ marginTop: 4, ...btnP, alignSelf: 'flex-start' }}>+ Add Account</button>
+      <button onClick={() => { setEditAccount(null); setDefaultPlatform('github'); setShowModal(true); }} style={{ marginTop: 4, ...btnP, alignSelf: 'flex-start' }}>+ Add Account</button>
 
       {showModal && (
         <AccountModal
           account={editAccount}
+          defaultPlatform={defaultPlatform}
           onClose={() => { setShowModal(false); setEditAccount(null); }}
           onSaved={() => { setShowModal(false); setEditAccount(null); loadAccounts(); }}
         />
@@ -328,9 +330,9 @@ function AccountsTab() {
 }
 
 // ── Account Modal ──
-function AccountModal({ account, onClose, onSaved }: { account: Account | null; onClose: () => void; onSaved: () => void }) {
+function AccountModal({ account, defaultPlatform, onClose, onSaved }: { account: Account | null; defaultPlatform: string; onClose: () => void; onSaved: () => void }) {
   const isEdit = !!account;
-  const [platform, setPlatform] = useState(account?.platform || 'github');
+  const [platform, setPlatform] = useState(account?.platform || defaultPlatform);
   const [displayName, setDisplayName] = useState(account?.display_name || '');
   const [interval, setInterval] = useState(account?.polling_interval_min || 60);
   const [creds, setCreds] = useState<Record<string, string>>({});
@@ -382,7 +384,7 @@ function AccountModal({ account, onClose, onSaved }: { account: Account | null; 
 
           <div>
             <label style={labelStyle}>Display Name</label>
-            <input value={displayName} onChange={e => setDisplayName(e.target.value)} style={inp} placeholder="My GitHub Account" />
+            <input value={displayName} onChange={e => setDisplayName(e.target.value)} style={inp} placeholder={`My ${platform.charAt(0).toUpperCase() + platform.slice(1)} Account`} />
           </div>
 
           <div>
