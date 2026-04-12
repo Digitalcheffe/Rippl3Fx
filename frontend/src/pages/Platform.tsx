@@ -4,6 +4,8 @@ import { C } from '../theme';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api/client';
 import EmptyState from '../components/EmptyState';
 import TagChip from '../components/TagChip';
+import DiscoveryPanel from '../components/DiscoveryPanel';
+import AccountStats from '../components/AccountStats';
 
 const font = "'DM Mono', monospace";
 
@@ -159,6 +161,20 @@ export default function Platform() {
             </div>
           )}
 
+          {/* Account Overview */}
+          {activeAccountId && <AccountStats accountId={activeAccountId} platform={name} />}
+
+          {/* Discovery Panel */}
+          {activeAccountId && (
+            <DiscoveryPanel
+              accountId={activeAccountId}
+              platform={name}
+              onItemTracked={() => {
+                if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
+              }}
+            />
+          )}
+
           {/* Tracked items header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', fontFamily: font }}>Tracked Items</div>
@@ -192,6 +208,7 @@ export default function Platform() {
           {showAddItem && activeAccountId && (
             <AddItemForm
               accountId={activeAccountId}
+              platform={platform || 'github'}
               allTags={allTags}
               onAdded={() => {
                 setShowAddItem(false);
@@ -309,7 +326,14 @@ function EditItemForm({ item, onSaved, onCancel }: { item: TrackedItem; onSaved:
 }
 
 // ── Add Item Form ──
-function AddItemForm({ accountId, allTags, onAdded }: { accountId: number; allTags: Tag[]; onAdded: () => void }) {
+const IDENTIFIER_HINTS: Record<string, string> = {
+  reddit: 'https://reddit.com/r/subreddit/comments/...',
+  github: 'owner/repo (e.g. Digitalcheffe/N.O.R.A)',
+  ga4: 'Page path (e.g. /blog/my-post)',
+  bing: 'Page URL (e.g. https://yoursite.com/page)',
+};
+
+function AddItemForm({ accountId, platform, allTags, onAdded }: { accountId: number; platform: string; allTags: Tag[]; onAdded: () => void }) {
   const [identifier, setIdentifier] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
@@ -343,7 +367,7 @@ function AddItemForm({ accountId, allTags, onAdded }: { accountId: number; allTa
       <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: 10, color: C.textSoft, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Platform Identifier</label>
-          <input value={identifier} onChange={e => setIdentifier(e.target.value)} style={inp} placeholder="owner/repo or URL" />
+          <input value={identifier} onChange={e => setIdentifier(e.target.value)} style={inp} placeholder={IDENTIFIER_HINTS[platform] || 'identifier'} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: 10, color: C.textSoft, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Display Name</label>

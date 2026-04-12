@@ -11,6 +11,7 @@ import itemsRouter from './routes/items';
 import tagsRouter from './routes/tags';
 import metricsRouter from './routes/metrics';
 import logsRouter from './routes/logs';
+import discoverRouter from './routes/discover';
 import * as scheduler from './poller/scheduler';
 
 // Run migrations before anything else
@@ -43,6 +44,7 @@ app.use('/api/items', itemsRouter);
 app.use('/api/tags', tagsRouter);
 app.use('/api', metricsRouter);
 app.use('/api/logs', logsRouter);
+app.use('/api/accounts', discoverRouter);
 
 // Serve frontend static files
 const distPath = path.join(__dirname, '..', 'dist');
