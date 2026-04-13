@@ -2,6 +2,7 @@ import db from '../db/connection';
 import { decryptCredentials } from '../crypto/credentials';
 import { getLocalDate } from '../utils/timezone';
 import { computeInterestScore } from '../lanes/score';
+import { writeMetrics } from '../lanes/unify';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 const LOOKBACK_DAYS = 14;
@@ -104,6 +105,11 @@ async function backfillGithub(trackedItemId: number, accountId: number, platform
     );
 
     recalcDailyScores(trackedItemId, 'github', date, columns);
+    writeMetrics(trackedItemId, 'github', 'daily', date, date, {
+      traffic_views: tv.views, traffic_uniques: tv.uniques,
+      stars: repoData.stargazers_count, forks: repoData.forks_count,
+      clones: tc.clones, clones_uniques: tc.uniques,
+    });
   }
 
   console.log(`[Backfill] GitHub: inserted ${dates.length} daily rows for ${platformIdentifier}`);
@@ -164,6 +170,7 @@ async function backfillGA4(trackedItemId: number, accountId: number, platformIde
     `).run(trackedItemId, sessions, pageviews, users, engagementRate, pageviews, sessions, date, date);
 
     recalcDailyScores(trackedItemId, 'ga4', date, columns);
+    writeMetrics(trackedItemId, 'ga4', 'daily', date, date, { pageviews, users, sessions, engagement_rate: engagementRate });
   }
 
   console.log(`[Backfill] GA4: inserted up to ${dates.length} daily rows for ${platformIdentifier}`);
@@ -202,6 +209,7 @@ async function backfillBing(trackedItemId: number, accountId: number, platformId
     `).run(trackedItemId, impressions, clicks, ctr, avgRank, impressions, clicks, date, date);
 
     recalcDailyScores(trackedItemId, 'bing', date, columns);
+    writeMetrics(trackedItemId, 'bing', 'daily', date, date, { impressions, clicks, ctr });
   }
 
   console.log(`[Backfill] Bing: inserted daily rows for ${platformIdentifier}`);

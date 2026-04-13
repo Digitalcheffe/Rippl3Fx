@@ -3,6 +3,7 @@ import {
   insertGithubMonthly, insertRedditMonthly, insertGA4Monthly, insertBingMonthly,
 } from '../db/queries/rollup';
 import { getLocalYearMonth } from '../utils/timezone';
+import { writeTrackedMetric, refreshUnifiedMetric } from '../lanes/unify';
 
 function getLastDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -70,10 +71,22 @@ export function runMonthlyRollup(year?: number, month?: number): void {
         }
       }
 
+      // Write monthly tracked_metrics from daily sums
+      const dailySums = db.prepare(`
+        SELECT COALESCE(SUM(reach_value), 0) as reach, COALESCE(SUM(interest_value), 0) as interest, COALESCE(SUM(engagement_value), 0) as engagement
+        FROM tracked_metrics WHERE tracked_item_id = ? AND period_type = 'daily' AND period_start BETWEEN ? AND ?
+      `).get(item.id, periodStart, periodEnd) as { reach: number; interest: number; engagement: number };
+      writeTrackedMetric(item.id, item.platform, 'monthly', periodStart, periodEnd, dailySums);
+
       count++;
     } catch (err: any) {
       console.error(`[Rollup] Failed monthly rollup for item ${item.id} (${item.platform}): ${err.message}`);
     }
+  }
+
+  // Refresh unified_metrics for all platforms
+  for (const platform of Object.keys(MONTHLY_TABLES)) {
+    refreshUnifiedMetric(platform, 'monthly', periodStart, periodEnd);
   }
 
   console.log(`[Rollup] Monthly rollup complete — processed ${count} items`);

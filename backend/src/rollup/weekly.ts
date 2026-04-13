@@ -3,6 +3,7 @@ import {
   insertGithubWeekly, insertRedditWeekly, insertGA4Weekly, insertBingWeekly,
 } from '../db/queries/rollup';
 import { getLocalDate } from '../utils/timezone';
+import { writeTrackedMetric, refreshUnifiedMetric, calcPerformanceScore } from '../lanes/unify';
 
 /**
  * Get Monday of the week containing the given date (timezone-aware).
@@ -72,10 +73,22 @@ export function runWeeklyRollup(weekStartDate?: string): void {
         }
       }
 
+      // Write weekly tracked_metrics from daily sums
+      const dailySums = db.prepare(`
+        SELECT COALESCE(SUM(reach_value), 0) as reach, COALESCE(SUM(interest_value), 0) as interest, COALESCE(SUM(engagement_value), 0) as engagement
+        FROM tracked_metrics WHERE tracked_item_id = ? AND period_type = 'daily' AND period_start BETWEEN ? AND ?
+      `).get(item.id, periodStart, periodEnd) as { reach: number; interest: number; engagement: number };
+      writeTrackedMetric(item.id, item.platform, 'weekly', periodStart, periodEnd, dailySums);
+
       count++;
     } catch (err: any) {
       console.error(`[Rollup] Failed weekly rollup for item ${item.id} (${item.platform}): ${err.message}`);
     }
+  }
+
+  // Refresh unified_metrics for all platforms
+  for (const platform of Object.keys(WEEKLY_TABLES)) {
+    refreshUnifiedMetric(platform, 'weekly', periodStart, periodEnd);
   }
 
   console.log(`[Rollup] Weekly rollup complete — processed ${count} items`);

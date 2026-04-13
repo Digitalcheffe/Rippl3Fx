@@ -3,6 +3,7 @@ import { insertGithubDaily, insertRedditDaily } from '../db/queries/rollup';
 import { computeInterestScore } from '../lanes/score';
 import { decryptCredentials } from '../crypto/credentials';
 import { getYesterdayDate } from '../utils/timezone';
+import { writeMetrics } from '../lanes/unify';
 import type { GA4Credentials, BingCredentials } from '../types';
 
 const DAILY_TABLES: Record<string, string> = {
@@ -157,6 +158,18 @@ export async function runDailyRollup(date?: string): Promise<void> {
           break;
       }
       updateDailyInterestScore(item.id, item.platform, rollupDate);
+
+      // Write to unified metrics tables
+      const dailyTable = DAILY_TABLES[item.platform];
+      if (dailyTable) {
+        const dailyRow = db.prepare(
+          `SELECT * FROM ${dailyTable} WHERE tracked_item_id = ? AND period_start = ?`
+        ).get(item.id, rollupDate) as Record<string, any> | undefined;
+        if (dailyRow) {
+          writeMetrics(item.id, item.platform, 'daily', rollupDate, rollupDate, dailyRow);
+        }
+      }
+
       count++;
     } catch (err: any) {
       console.error(`[Rollup] Failed daily rollup for item ${item.id} (${item.platform}): ${err.message}`);
