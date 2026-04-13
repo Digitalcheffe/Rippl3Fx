@@ -176,7 +176,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <hr style={{ border: 'none', borderTop: `1px solid ${C.border}`, margin: '10px 0' }} />
+      <hr style={{ border: 'none', borderTop: `3px solid ${C.borderMid}`, margin: '10px 0' }} />
 
       {/* Row 2: Tag selector */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16 }}>

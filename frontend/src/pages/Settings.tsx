@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { C } from '../theme';
 import { useAuth } from '../context/AuthContext';
 import { apiGet, apiPost, apiPut, apiDelete } from '../api/client';
@@ -48,7 +49,8 @@ const CREDENTIAL_FIELDS: Record<string, Array<{ key: string; label: string; type
 
 export default function Settings() {
   const { user, checkAuth } = useAuth();
-  const [tab, setTab] = useState('profile');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get('tab') || 'profile');
   const tabs = [
     { k: 'profile', l: 'Profile' },
     { k: 'accounts', l: 'Platform Accounts' },

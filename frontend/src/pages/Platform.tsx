@@ -87,6 +87,7 @@ export default function Platform() {
   const [activeChart, setActiveChart] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [activeTag, setActiveTag] = useState('All');
+  const [showDiscovery, setShowDiscovery] = useState(false);
 
   // Load accounts for this platform
   useEffect(() => {
@@ -235,7 +236,7 @@ export default function Platform() {
         </div>
       </div>
 
-      <hr style={{ border: 'none', borderTop: `1px solid ${C.border}`, margin: '10px 0' }} />
+      <hr style={{ border: 'none', borderTop: `3px solid ${C.borderMid}`, margin: '10px 0' }} />
 
       {/* Row 2: Tag selector + Poll Now + Info */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -254,6 +255,14 @@ export default function Platform() {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {activeAccountId && (
+            <button onClick={() => setShowDiscovery(true)} style={{
+              padding: '5px 12px', background: platformColor + '15',
+              border: `1px solid ${platformColor}40`, borderRadius: 6,
+              color: platformColor, fontSize: 10, fontWeight: 700,
+              cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
+            }}>Browse</button>
+          )}
           <button onClick={handlePollNow} disabled={polling} style={{
             padding: '5px 12px', background: C.up + '15',
             border: `1px solid ${C.up}55`, borderRadius: 6,
@@ -266,6 +275,26 @@ export default function Platform() {
           <LaneInfoButton onClick={() => setShowInfo(!showInfo)} />
         </div>
       </div>
+
+      {/* Discovery modal */}
+      {showDiscovery && activeAccountId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(13,31,53,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: C.bgCard, border: `1px solid ${C.borderMid}`, borderRadius: 14, width: 560, maxHeight: '80vh', overflow: 'auto', padding: 22, boxShadow: '0 24px 64px rgba(13,31,53,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: C.text, fontFamily: font }}>Discoverable Content</span>
+              <button onClick={() => setShowDiscovery(false)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 18, cursor: 'pointer' }}>x</button>
+            </div>
+            <DiscoveryPanel
+              accountId={activeAccountId}
+              platform={name}
+              autoExpand
+              onItemTracked={() => {
+                if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {showInfo && <LaneInfoPanel platform={name} onClose={() => setShowInfo(false)} />}
 
@@ -480,16 +509,7 @@ export default function Platform() {
             );
           })()}
 
-              {/* Discovery Panel */}
-              {activeAccountId && (
-                <DiscoveryPanel
-                  accountId={activeAccountId}
-                  platform={name}
-                  onItemTracked={() => {
-                    if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
-                  }}
-                />
-              )}
+              {/* Discovery Panel (modal, triggered from header) */}
             </div>
 
             {/* Right column: Account Overview */}
