@@ -2,7 +2,7 @@ import db from '../db/connection';
 import { decryptCredentials } from '../crypto/credentials';
 import { getLocalDate } from '../utils/timezone';
 import { computeInterestScore } from '../lanes/score';
-import { writeMetrics } from '../lanes/unify';
+import { writeMetrics, writeTrackedMetric, refreshUnifiedMetric } from '../lanes/unify';
 import { insertPollLog } from '../db/queries/logs';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
@@ -215,6 +215,72 @@ async function backfillBing(trackedItemId: number, accountId: number, platformId
   console.log(`[Backfill] Bing: inserted daily rows for ${platformIdentifier}`);
 }
 
+/** After daily backfill, roll up into weekly and monthly tracked_metrics + unified_metrics. */
+function rollupBackfilledData(trackedItemId: number, platform: string): void {
+  const dailies = db.prepare(
+    "SELECT * FROM tracked_metrics WHERE tracked_item_id = ? AND period_type = 'daily' ORDER BY period_start"
+  ).all(trackedItemId) as Record<string, any>[];
+
+  if (dailies.length === 0) return;
+
+  const { getPerformanceWeights } = require('../routes/performance');
+  const w = getPerformanceWeights();
+
+  // Group by week (Monday)
+  const weeks: Record<string, Record<string, any>[]> = {};
+  for (const d of dailies) {
+    const dt = new Date(d.period_start + 'T12:00:00');
+    const day = dt.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    dt.setDate(dt.getDate() + diff);
+    const mon = dt.toISOString().split('T')[0];
+    if (!weeks[mon]) weeks[mon] = [];
+    weeks[mon].push(d);
+  }
+
+  for (const [mon, rows] of Object.entries(weeks)) {
+    const sun = new Date(new Date(mon + 'T12:00:00').getTime() + 6 * 86_400_000).toISOString().split('T')[0];
+    const reach = rows.reduce((s, r) => s + (r.reach_value ?? 0), 0);
+    const interest = rows.reduce((s, r) => s + (r.interest_value ?? 0), 0);
+    const engagement = rows.reduce((s, r) => s + (r.engagement_value ?? 0), 0);
+    const perf = Math.round((reach * w.reach + interest * w.interest + engagement * w.engagement) * 100) / 100;
+
+    writeTrackedMetric(trackedItemId, platform, 'weekly', mon, sun, { reach, interest, engagement });
+  }
+
+  // Group by month
+  const months: Record<string, Record<string, any>[]> = {};
+  for (const d of dailies) {
+    const ym = d.period_start.slice(0, 7);
+    if (!months[ym]) months[ym] = [];
+    months[ym].push(d);
+  }
+
+  for (const [ym, rows] of Object.entries(months)) {
+    const start = ym + '-01';
+    const [y, m] = ym.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const end = `${ym}-${String(lastDay).padStart(2, '0')}`;
+    const reach = rows.reduce((s, r) => s + (r.reach_value ?? 0), 0);
+    const interest = rows.reduce((s, r) => s + (r.interest_value ?? 0), 0);
+    const engagement = rows.reduce((s, r) => s + (r.engagement_value ?? 0), 0);
+
+    writeTrackedMetric(trackedItemId, platform, 'monthly', start, end, { reach, interest, engagement });
+  }
+
+  // Refresh unified for all affected weeks and months
+  for (const periodType of ['weekly', 'monthly'] as const) {
+    const periods = db.prepare(
+      "SELECT DISTINCT period_start, period_end FROM tracked_metrics WHERE tracked_item_id = ? AND period_type = ?"
+    ).all(trackedItemId, periodType) as Array<{ period_start: string; period_end: string }>;
+    for (const p of periods) {
+      refreshUnifiedMetric(platform, periodType, p.period_start, p.period_end);
+    }
+  }
+
+  console.log(`[Backfill] Rolled up weekly/monthly for item ${trackedItemId}`);
+}
+
 /** Run historical backfill for a newly tracked item. Fire-and-forget. */
 export async function runHistoricalBackfill(trackedItemId: number, accountId: number, platform: string, platformIdentifier: string): Promise<void> {
   insertPollLog({ metric_account_id: accountId, tracked_item_id: trackedItemId, platform, level: 'info', message: `Backfill started for ${platformIdentifier} (${LOOKBACK_DAYS} days)` });
@@ -224,6 +290,8 @@ export async function runHistoricalBackfill(trackedItemId: number, accountId: nu
       case 'ga4':    await backfillGA4(trackedItemId, accountId, platformIdentifier); break;
       case 'bing':   await backfillBing(trackedItemId, accountId, platformIdentifier); break;
     }
+    // Roll up daily data into weekly/monthly
+    rollupBackfilledData(trackedItemId, platform);
     insertPollLog({ metric_account_id: accountId, tracked_item_id: trackedItemId, platform, level: 'info', message: `Backfill completed for ${platformIdentifier}` });
   } catch (err: any) {
     console.error(`[Backfill] Failed for ${platform} item ${trackedItemId}: ${err.message}`);
