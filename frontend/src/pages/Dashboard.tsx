@@ -169,12 +169,9 @@ export default function Dashboard() {
                 cursor: 'pointer', fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5,
               }}>{range}</button>
             ))}
-          <LaneInfoButton onClick={() => setShowInfo(!showInfo)} />
           </div>
         </div>
       </div>
-
-      {showInfo && <LaneInfoPanel onClose={() => setShowInfo(false)} />}
 
       {loading ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
