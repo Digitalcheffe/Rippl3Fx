@@ -4,16 +4,14 @@ import { decryptCredentials } from '../crypto/credentials';
 import { collectGithub } from '../platforms/github';
 import { collectGA4 } from '../platforms/ga4';
 import { collectBing } from '../platforms/bing';
+import { collectAccountStats } from '../platforms/account-stats';
 import { insertPollLog } from '../db/queries/logs';
-import { getTimezone, getLocalDate } from '../utils/timezone';
+import { getTimezone, getLocalHour } from '../utils/timezone';
 import { writeMetrics } from '../lanes/unify';
 import { getLatestSnapshot } from '../db/queries/metrics';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promise<void> {
-  const items = getActiveTrackedItems(account.id);
-  if (items.length === 0) return;
-
   let credentials: any;
   try {
     credentials = decryptCredentials(account.credentials);
@@ -27,6 +25,15 @@ async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promi
 
   let allSuccess = true;
 
+  // 1. Always collect account-level stats → unified_metrics
+  const acctResult = await collectAccountStats(account.id, account.platform, credentials);
+  if (!acctResult.success) {
+    insertPollLog({ metric_account_id: account.id, platform: account.platform, level: 'error', message: `Account stats failed: ${acctResult.error}` });
+    allSuccess = false;
+  }
+
+  // 2. Collect per-tracked-item data + hourly metrics
+  const items = getActiveTrackedItems(account.id);
   for (const item of items) {
     try {
       let result: { success: boolean; error?: string } = { success: false, error: 'Unknown platform' };
@@ -45,11 +52,11 @@ async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promi
 
       if (result.success) {
         insertPollLog({ metric_account_id: account.id, tracked_item_id: item.id, platform: account.platform, level: 'info', message: `Collected ${item.display_name} (${item.platform_identifier})` });
-        // Write to unified metrics tables
+        // Write hourly metrics
         const snap = getLatestSnapshot(item.id, account.platform);
         if (snap) {
-          const now = getLocalDate();
-          writeMetrics(item.id, account.platform, 'hourly', now, now, snap, account.id);
+          const hour = getLocalHour();
+          writeMetrics(item.id, account.platform, 'hourly', hour, hour, snap, account.id);
         }
       } else {
         insertPollLog({ metric_account_id: account.id, tracked_item_id: item.id, platform: account.platform, level: 'error', message: `Failed ${item.display_name} (${item.platform_identifier}): ${result.error}` });

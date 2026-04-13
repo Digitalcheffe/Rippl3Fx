@@ -45,8 +45,42 @@ export function getLatestUnified(platform: string, periodType: string): Record<s
   ).get(platform, periodType) as Record<string, any> | undefined ?? null;
 }
 
-/** Get the two most recent unified_metrics rows for velocity. For weekly/monthly, includes live current period. */
+/** Get live "today" for a platform from the latest unified_hourly_metrics row. */
+function computeCurrentUnifiedDaily(platform: string): Record<string, any> | null {
+  const today = getLocalDate();
+  const row = db.prepare(`
+    SELECT platform, 'daily' as period_type, ? as period_start, ? as period_end,
+           reach_value, interest_value, engagement_value, performance_score
+    FROM unified_hourly_metrics
+    WHERE platform = ? AND period_start LIKE ?
+    ORDER BY period_start DESC LIMIT 1
+  `).get(today, today, platform, today + '%') as Record<string, any> | undefined;
+
+  if (!row || (row.reach_value === 0 && row.interest_value === 0 && row.engagement_value === 0)) return null;
+  return row;
+}
+
+/** Get the two most recent unified_metrics rows for velocity. For daily, includes live today from hourly. For weekly/monthly, includes live current period. */
 export function getUnifiedPair(platform: string, periodType: string): { current: Record<string, any> | null; previous: Record<string, any> | null } {
+  if (periodType === 'daily') {
+    const today = getLocalDate();
+    const stored = db.prepare(
+      'SELECT * FROM unified_metrics WHERE platform = ? AND period_type = ? ORDER BY period_start DESC LIMIT 2'
+    ).all(platform, periodType) as Record<string, any>[];
+
+    // If today already has a daily row (rollup ran), use it
+    if (stored.length > 0 && stored[0].period_start === today) {
+      return { current: stored[0], previous: stored[1] ?? null };
+    }
+
+    // No daily row for today — use live preview from hourly
+    const live = computeCurrentUnifiedDaily(platform);
+    if (live) {
+      return { current: live, previous: stored[0] ?? null };
+    }
+    return { current: stored[0] ?? null, previous: stored[1] ?? null };
+  }
+
   if (periodType === 'weekly' || periodType === 'monthly') {
     const live = computeCurrentUnified(platform, periodType);
     const stored = db.prepare(
@@ -108,4 +142,21 @@ export function getAllPlatformHistory(periodType: string, limit: number = 7): Re
     result[p] = getUnifiedHistory(p, periodType, limit);
   }
   return result;
+}
+
+// ── Unified hourly queries (separate table: unified_hourly_metrics) ──
+
+/** Get the two most recent unified_hourly_metrics rows for a platform. */
+export function getUnifiedHourlyPair(platform: string): { current: Record<string, any> | null; previous: Record<string, any> | null } {
+  const rows = db.prepare(
+    'SELECT * FROM unified_hourly_metrics WHERE platform = ? ORDER BY period_start DESC LIMIT 2'
+  ).all(platform) as Record<string, any>[];
+  return { current: rows[0] ?? null, previous: rows[1] ?? null };
+}
+
+/** Get N most recent unified_hourly_metrics rows for a platform's trend chart. */
+export function getUnifiedHourlyHistory(platform: string, limit: number = 24): Record<string, any>[] {
+  return db.prepare(
+    'SELECT * FROM unified_hourly_metrics WHERE platform = ? ORDER BY period_start DESC LIMIT ?'
+  ).all(platform, limit) as Record<string, any>[];
 }

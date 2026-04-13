@@ -2,8 +2,8 @@ import db from '../db/connection';
 import { Octokit } from '@octokit/rest';
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import axios from 'axios';
-import { getLocalDate } from '../utils/timezone';
-import { calcPerformanceScore, updatePeaks } from '../lanes/unify';
+import { getLocalDate, getLocalHour } from '../utils/timezone';
+import { calcPerformanceScore, updatePeaks, mapToLanes } from '../lanes/unify';
 import { calcLanesFromRaw, calcLanesFromDaily } from '../lanes/calc';
 import { getWeekStart, getWeekEnd } from '../utils/week';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
@@ -36,6 +36,7 @@ export async function collectRawMetrics(platform: string, credentials: any): Pro
       const creds = credentials as GithubCredentials;
       const octokit = new Octokit({ auth: creds.personalAccessToken });
       const { data: repos } = await octokit.repos.listForAuthenticatedUser({ per_page: 100, type: 'owner' });
+      const today = getLocalDate();
 
       raw.stars = 0; raw.watchers = 0; raw.forks = 0;
       raw.traffic_views = 0; raw.clones = 0; raw.release_downloads = 0;
@@ -47,12 +48,15 @@ export async function collectRawMetrics(platform: string, credentials: any): Pro
 
         try {
           const { data: views } = await octokit.repos.getViews({ owner: repo.owner.login, repo: repo.name, per: 'day' });
-          raw.traffic_views += views.count || 0;
+          // Pick today's entry from the per-day array, not the 14-day total
+          const todayViews = views.views?.find((v: any) => v.timestamp?.startsWith(today));
+          raw.traffic_views += todayViews?.count || 0;
         } catch { /* no access */ }
 
         try {
           const { data: clones } = await octokit.repos.getClones({ owner: repo.owner.login, repo: repo.name, per: 'day' });
-          raw.clones += clones.count || 0;
+          const todayClones = clones.clones?.find((c: any) => c.timestamp?.startsWith(today));
+          raw.clones += todayClones?.count || 0;
         } catch { /* no access */ }
 
         try {
@@ -93,11 +97,18 @@ export async function collectRawMetrics(platform: string, credentials: any): Pro
         params: { apikey: creds.apiKey, siteUrl: creds.siteUrl },
       });
 
+      const today = getLocalDate();
       const entries = data?.d ?? data;
       raw.impressions = 0; raw.clicks = 0; raw.ctr = 0;
       if (Array.isArray(entries)) {
         let totalCtr = 0, ctrCount = 0;
         for (const entry of entries) {
+          // Filter to today only — each entry has a Date field with epoch ms
+          const dateMatch = entry.Date?.match(/\d+/);
+          if (dateMatch) {
+            const entryDate = new Date(parseInt(dateMatch[0])).toISOString().split('T')[0];
+            if (entryDate !== today) continue;
+          }
           raw.impressions += entry.Impressions ?? 0;
           raw.clicks += entry.Clicks ?? 0;
           if (entry.Impressions > 0) { totalCtr += (entry.Clicks ?? 0) / entry.Impressions; ctrCount++; }
@@ -111,12 +122,31 @@ export async function collectRawMetrics(platform: string, credentials: any): Pro
   return raw;
 }
 
+/** Write a row to unified_hourly_metrics (account-level throwaway, purged after 48hrs).
+ *  Stores raw API values mapped to lanes — no delta tracking. */
+function writeUnifiedHourly(platform: string, rawMetrics: Record<string, number>): void {
+  const lanes = mapToLanes(platform, rawMetrics);
+  const perf = calcPerformanceScore(lanes);
+  const hour = getLocalHour();
+
+  db.prepare(`
+    INSERT INTO unified_hourly_metrics (platform, period_start, reach_value, interest_value, engagement_value, performance_score)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(platform, period_start) DO UPDATE SET
+      reach_value = excluded.reach_value,
+      interest_value = excluded.interest_value,
+      engagement_value = excluded.engagement_value,
+      performance_score = excluded.performance_score
+  `).run(platform, hour, lanes.reach, lanes.interest, lanes.engagement, perf);
+}
+
 export async function collectAccountStats(accountId: number, platform: string, credentials: any): Promise<{ success: boolean; lanes?: LaneValues; error?: string }> {
   try {
     const raw = await collectRawMetrics(platform, credentials);
     const lanes = calcLanesFromRaw(accountId, platform, raw);
 
     writeAccountUnified(platform, lanes);
+    writeUnifiedHourly(platform, raw);
     console.log(`[AccountStats] Collected ${platform} account-level: reach=${lanes.reach} interest=${lanes.interest} engagement=${lanes.engagement}`);
     return { success: true, lanes };
   } catch (err: any) {

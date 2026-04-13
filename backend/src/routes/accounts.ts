@@ -151,7 +151,7 @@ router.delete('/:id', (req: Request, res: Response) => {
     const placeholders = idList.map(() => '?').join(',');
     // Clean up all references to tracked items
     dbConn.prepare(`DELETE FROM tracked_metrics WHERE tracked_item_id IN (${placeholders})`).run(...idList);
-    dbConn.prepare(`DELETE FROM hourly_metrics WHERE tracked_item_id IN (${placeholders})`).run(...idList);
+    dbConn.prepare(`DELETE FROM tracked_hourly_metrics WHERE tracked_item_id IN (${placeholders})`).run(...idList);
     dbConn.prepare(`DELETE FROM peak_metrics WHERE tracked_item_id IN (${placeholders})`).run(...idList);
     dbConn.prepare(`DELETE FROM metric_previous WHERE tracked_item_id IN (${placeholders})`).run(...idList);
     dbConn.prepare(`DELETE FROM item_tags WHERE tracked_item_id IN (${placeholders})`).run(...idList);
@@ -228,6 +228,15 @@ router.post('/:id/poll-now', async (req: Request, res: Response) => {
     }
     if (result.success) {
       insertPollLog({ metric_account_id: id, tracked_item_id: item.id, platform: fullAccount.platform, level: 'info', message: `Poll Now: collected ${item.display_name} (${item.platform_identifier})` });
+      // Write hourly metrics (same as scheduler tick)
+      const { getLatestSnapshot } = require('../db/queries/metrics');
+      const { writeMetrics } = require('../lanes/unify');
+      const { getLocalHour } = require('../utils/timezone');
+      const snap = getLatestSnapshot(item.id, fullAccount.platform);
+      if (snap) {
+        const hour = getLocalHour();
+        writeMetrics(item.id, fullAccount.platform, 'hourly', hour, hour, snap, id);
+      }
     } else {
       insertPollLog({ metric_account_id: id, tracked_item_id: item.id, platform: fullAccount.platform, level: 'error', message: `Poll Now: failed ${item.display_name} (${item.platform_identifier}) — ${result.error}` });
     }

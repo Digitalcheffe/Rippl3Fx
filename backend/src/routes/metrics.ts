@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getTrackedItemsWithPlatform, getTagsForItem, getLatestSnapshot } from '../db/queries/metrics';
 import { getTrackedPair, getTrackedHistory, getHourlyPair, getHourlyHistory } from '../db/queries/tracked';
-import { getUnifiedPair, getUnifiedHistory } from '../db/queries/unified';
+import { getUnifiedPair, getUnifiedHistory, getUnifiedHourlyPair, getUnifiedHourlyHistory } from '../db/queries/unified';
 import { getPerformanceWeights } from './performance';
 import { getPeaks } from '../lanes/unify';
 
@@ -15,7 +15,7 @@ router.get('/dashboard', (req: Request, res: Response) => {
   const weights = getPerformanceWeights();
 
   const items = trackedItems.map(ti => {
-    // Get current + previous — hourly reads from hourly_metrics, others from tracked_metrics
+    // Get current + previous — hourly reads from tracked_hourly_metrics, others from tracked_metrics
     const { current, previous } = range === 'hourly'
       ? getHourlyPair(ti.id)
       : getTrackedPair(ti.id, range);
@@ -34,21 +34,23 @@ router.get('/dashboard', (req: Request, res: Response) => {
     };
     const performanceVelocity = performanceScore - (previous?.performance_score ?? 0);
 
-    // History arrays for charts (last 7 periods)
+    // History arrays for charts (last 24 hours for hourly, last 7 periods otherwise)
+    const historyLimit = range === 'hourly' ? 24 : 7;
     const history = (range === 'hourly'
-      ? getHourlyHistory(ti.id, 7)
-      : getTrackedHistory(ti.id, range, 7)
+      ? getHourlyHistory(ti.id, historyLimit)
+      : getTrackedHistory(ti.id, range, historyLimit)
     ).reverse();
     const reachHistory = history.map(r => r.reach_value ?? 0);
     const interestHistory = history.map(r => r.interest_value ?? 0);
     const engagementHistory = history.map(r => r.engagement_value ?? 0);
     const performanceHistory = history.map(r => r.performance_score ?? 0);
 
-    // Pad to 7 if less
-    while (reachHistory.length < 7) reachHistory.unshift(0);
-    while (interestHistory.length < 7) interestHistory.unshift(0);
-    while (engagementHistory.length < 7) engagementHistory.unshift(0);
-    while (performanceHistory.length < 7) performanceHistory.unshift(0);
+    // Pad to expected length if less
+    const padLen = range === 'hourly' ? 24 : 7;
+    while (reachHistory.length < padLen) reachHistory.unshift(0);
+    while (interestHistory.length < padLen) interestHistory.unshift(0);
+    while (engagementHistory.length < padLen) engagementHistory.unshift(0);
+    while (performanceHistory.length < padLen) performanceHistory.unshift(0);
 
     // Still provide latestSnapshot for platform-specific detail views
     const latestSnapshot = getLatestSnapshot(ti.id, ti.platform);
@@ -100,20 +102,25 @@ router.get('/dashboard', (req: Request, res: Response) => {
       platforms[p].performanceVelocity += item.performanceVelocity;
     }
   } else if (range === 'hourly') {
-    // Hourly: compute from items (unified_metrics not populated for hourly)
-    for (const item of items) {
-      const p = item.platform;
-      if (!platforms[p]) {
+    // Hourly: read from unified_tracked_hourly_metrics (account-level)
+    for (const p of ['github', 'ga4', 'bing']) {
+      const { current, previous } = getUnifiedHourlyPair(p);
+      if (current) {
+        platforms[p] = {
+          reach: current.reach_value ?? 0,
+          interest: current.interest_value ?? 0,
+          engagement: current.engagement_value ?? 0,
+          performanceScore: Math.round((current.performance_score ?? 0) * 100) / 100,
+          velocity: {
+            reach: (current.reach_value ?? 0) - (previous?.reach_value ?? 0),
+            interest: (current.interest_value ?? 0) - (previous?.interest_value ?? 0),
+            engagement: (current.engagement_value ?? 0) - (previous?.engagement_value ?? 0),
+          },
+          performanceVelocity: Math.round(((current.performance_score ?? 0) - (previous?.performance_score ?? 0)) * 100) / 100,
+        };
+      } else {
         platforms[p] = { reach: 0, interest: 0, engagement: 0, performanceScore: 0, velocity: { reach: 0, interest: 0, engagement: 0 }, performanceVelocity: 0 };
       }
-      platforms[p].reach += item.reach;
-      platforms[p].interest += item.interest;
-      platforms[p].engagement += item.engagement;
-      platforms[p].performanceScore += item.performanceScore;
-      platforms[p].velocity.reach += item.velocity.reach;
-      platforms[p].velocity.interest += item.velocity.interest;
-      platforms[p].velocity.engagement += item.velocity.engagement;
-      platforms[p].performanceVelocity += item.performanceVelocity;
     }
   } else {
     // Daily/weekly/monthly: use unified_metrics (platform-wide totals)
@@ -144,12 +151,13 @@ router.get('/dashboard', (req: Request, res: Response) => {
     platforms[p].peaks = getPeaks(null, p, effectiveRange);
 
     // Platform-level history for charts
+    const hLen = range === 'hourly' ? 24 : 7;
     if (tagFilter) {
       // Tag-filtered: sum history from filtered items for this platform
       const platformItems = items.filter(i => i.platform === p);
-      const reachH = [0,0,0,0,0,0,0], interestH = [0,0,0,0,0,0,0], engagementH = [0,0,0,0,0,0,0], perfH = [0,0,0,0,0,0,0];
+      const reachH = new Array(hLen).fill(0), interestH = new Array(hLen).fill(0), engagementH = new Array(hLen).fill(0), perfH = new Array(hLen).fill(0);
       for (const item of platformItems) {
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < hLen; i++) {
           reachH[i] += item.reachHistory?.[i] ?? 0;
           interestH[i] += item.interestHistory?.[i] ?? 0;
           engagementH[i] += item.engagementHistory?.[i] ?? 0;
@@ -160,8 +168,19 @@ router.get('/dashboard', (req: Request, res: Response) => {
       platforms[p].interestHistory = interestH;
       platforms[p].engagementHistory = engagementH;
       platforms[p].performanceHistory = perfH;
+    } else if (range === 'hourly') {
+      // Hourly: use unified_hourly_metrics history
+      const history = getUnifiedHourlyHistory(p, 24).reverse();
+      platforms[p].reachHistory = history.map(r => r.reach_value ?? 0);
+      platforms[p].interestHistory = history.map(r => r.interest_value ?? 0);
+      platforms[p].engagementHistory = history.map(r => r.engagement_value ?? 0);
+      platforms[p].performanceHistory = history.map(r => r.performance_score ?? 0);
+      while (platforms[p].reachHistory.length < 24) platforms[p].reachHistory.unshift(0);
+      while (platforms[p].interestHistory.length < 24) platforms[p].interestHistory.unshift(0);
+      while (platforms[p].engagementHistory.length < 24) platforms[p].engagementHistory.unshift(0);
+      while (platforms[p].performanceHistory.length < 24) platforms[p].performanceHistory.unshift(0);
     } else {
-      // Unfiltered: use unified_metrics history
+      // Unfiltered daily/weekly/monthly: use unified_metrics history
       const history = getUnifiedHistory(p, effectiveRange, 7).reverse();
       platforms[p].reachHistory = history.map(r => r.reach_value ?? 0);
       platforms[p].interestHistory = history.map(r => r.interest_value ?? 0);
@@ -223,7 +242,8 @@ router.post('/recalculate', (_req: Request, res: Response) => {
   db.prepare("DELETE FROM tracked_metrics").run();
   db.prepare("DELETE FROM unified_metrics").run();
   db.prepare("DELETE FROM peak_metrics").run();
-  db.prepare("DELETE FROM hourly_metrics").run();
+  db.prepare("DELETE FROM tracked_hourly_metrics").run();
+  db.prepare("DELETE FROM unified_hourly_metrics").run();
   db.prepare("DELETE FROM metric_previous WHERE tracked_item_id IS NOT NULL").run();
 
   // 2. Get all tracked items with their accounts

@@ -149,7 +149,7 @@ export function getPeaks(trackedItemId: number | null, platform: string, periodT
   return row ?? null;
 }
 
-/** Write a row to hourly_metrics (separate throwaway table, purged after 48hrs). */
+/** Write a row to tracked_hourly_metrics (separate throwaway table, purged after 48hrs). */
 export function writeHourlyMetric(
   trackedItemId: number,
   platform: string,
@@ -158,7 +158,7 @@ export function writeHourlyMetric(
 ): void {
   const perf = calcPerformanceScore(lanes);
   db.prepare(`
-    INSERT INTO hourly_metrics (tracked_item_id, platform, period_start, reach_value, interest_value, engagement_value, performance_score)
+    INSERT INTO tracked_hourly_metrics (tracked_item_id, platform, period_start, reach_value, interest_value, engagement_value, performance_score)
     VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(tracked_item_id, period_start) DO UPDATE SET
       reach_value = excluded.reach_value,
@@ -169,9 +169,9 @@ export function writeHourlyMetric(
 }
 
 /**
- * Full write: raw platform data → config-driven lane calc → write metrics → refresh unified → update peaks.
- * Uses metric_config (delta/incremental) and metric_previous for per-item delta tracking.
- * Hourly writes go to hourly_metrics (separate table); daily/weekly/monthly go to tracked_metrics.
+ * Full write: raw platform data → write metrics → refresh unified → update peaks.
+ * Hourly: raw values mapped to lanes via mapToLanes (no delta tracking).
+ * Daily/weekly/monthly: config-driven lane calc via calcLanesFromRaw (delta tracking).
  */
 export function writeMetrics(
   trackedItemId: number,
@@ -182,15 +182,15 @@ export function writeMetrics(
   rawRow: Record<string, any>,
   accountId?: number,
 ): void {
-  // Use config-driven lane calculation when accountId is provided (respects delta/incremental)
-  // Falls back to mapToLanes for backward compatibility
-  const lanes = accountId
-    ? calcLanesFromRaw(accountId, platform, rawRow, true, trackedItemId)
-    : mapToLanes(platform, rawRow);
-
   if (periodType === 'hourly') {
+    // Hourly = raw snapshot, no delta tracking
+    const lanes = mapToLanes(platform, rawRow);
     writeHourlyMetric(trackedItemId, platform, periodStart, lanes);
   } else {
+    // Daily/weekly/monthly = config-driven lane calc with delta tracking
+    const lanes = accountId
+      ? calcLanesFromRaw(accountId, platform, rawRow, true, trackedItemId)
+      : mapToLanes(platform, rawRow);
     writeTrackedMetric(trackedItemId, platform, periodType, periodStart, periodEnd, lanes);
     refreshUnifiedMetric(platform, periodType, periodStart, periodEnd);
   }
