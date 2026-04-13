@@ -172,13 +172,29 @@ router.delete('/:id', (req: Request, res: Response) => {
   dbConn.prepare('DELETE FROM tracked_items WHERE metric_account_id = ?').run(id);
   dbConn.prepare('DELETE FROM metric_accounts WHERE id = ?').run(id);
 
-  // Clean up unified_metrics for this platform if no data remains
+  // Clean up unified/hourly metrics for this platform
   const platform = account.platform;
-  const remaining = dbConn.prepare("SELECT COUNT(*) as c FROM tracked_metrics WHERE platform = ?").get(platform) as any;
-  if (remaining.c === 0) {
+  const remainingAccounts = dbConn.prepare("SELECT COUNT(*) as c FROM metric_accounts WHERE platform = ?").get(platform) as any;
+  if (remainingAccounts.c === 0) {
+    // No accounts left for this platform — clear everything
     dbConn.prepare('DELETE FROM unified_metrics WHERE platform = ?').run(platform);
+    dbConn.prepare('DELETE FROM unified_hourly_metrics WHERE platform = ?').run(platform);
     dbConn.prepare('DELETE FROM peak_metrics WHERE platform = ? AND tracked_item_id IS NULL').run(platform);
+  } else {
+    // Other accounts remain — recalculate unified_metrics from remaining tracked_metrics
+    const { refreshUnifiedMetric } = require('../lanes/unify');
+    const periods = dbConn.prepare(
+      "SELECT DISTINCT period_type, period_start, period_end FROM tracked_metrics WHERE platform = ?"
+    ).all(platform) as Array<{ period_type: string; period_start: string; period_end: string }>;
+    for (const p of periods) {
+      refreshUnifiedMetric(platform, p.period_type, p.period_start, p.period_end);
+    }
+    // Clear hourly — will repopulate on next poll
+    dbConn.prepare('DELETE FROM unified_hourly_metrics WHERE platform = ?').run(platform);
   }
+
+  // Clean up orphaned tags (tags with no item_tags references)
+  dbConn.prepare('DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM item_tags)').run();
 
   res.json({ success: true, message: `Account permanently deleted. ${idList.length} items purged.` });
 });
