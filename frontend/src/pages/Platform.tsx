@@ -324,9 +324,21 @@ export default function Platform() {
                       <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px' }}>
                         <EditItemForm
                           item={item}
+                          allTags={allTags}
+                          currentTagIds={(itemTags[item.id] || []).map(t => t.id)}
                           onSaved={() => {
                             setEditingItem(null);
                             if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
+                            // Refresh tags
+                            Promise.all(items.map(async it => {
+                              const tags = await apiGet<Tag[]>(`/tags/items/${it.id}/tags`).catch(() => []);
+                              return { id: it.id, tags };
+                            })).then(results => {
+                              const map: Record<number, Tag[]> = {};
+                              results.forEach(r => { map[r.id] = r.tags; });
+                              setItemTags(map);
+                            });
+                            apiGet<Tag[]>('/tags').then(setAllTags).catch(() => {});
                           }}
                           onCancel={() => setEditingItem(null)}
                         />
@@ -378,9 +390,13 @@ export default function Platform() {
 }
 
 // ── Edit Item Form ──
-function EditItemForm({ item, onSaved, onCancel }: { item: TrackedItem; onSaved: () => void; onCancel: () => void }) {
+function EditItemForm({ item, allTags, currentTagIds, onSaved, onCancel }: {
+  item: TrackedItem; allTags: Tag[]; currentTagIds: number[]; onSaved: () => void; onCancel: () => void;
+}) {
   const [identifier, setIdentifier] = useState(item.platform_identifier);
   const [displayName, setDisplayName] = useState(item.display_name);
+  const [selectedTags, setSelectedTags] = useState<number[]>(currentTagIds);
+  const [newTagName, setNewTagName] = useState('');
   const [error, setError] = useState('');
 
   const handleSave = async () => {
@@ -392,10 +408,37 @@ function EditItemForm({ item, onSaved, onCancel }: { item: TrackedItem; onSaved:
         platform_identifier: identifier.trim(),
         display_name: displayName.trim(),
       });
+
+      // Sync tags: get current, remove removed, add added
+      const currentTags = await apiGet<Tag[]>(`/tags/items/${item.id}/tags`).catch(() => []);
+      const currentIds = currentTags.map(t => t.id);
+
+      // Remove tags no longer selected
+      for (const tagId of currentIds) {
+        if (!selectedTags.includes(tagId)) {
+          await apiDelete(`/tags/items/${item.id}/tags/${tagId}`).catch(() => {});
+        }
+      }
+      // Add newly selected tags
+      for (const tagId of selectedTags) {
+        if (!currentIds.includes(tagId)) {
+          await apiPost(`/tags/items/${item.id}/tags`, { tag_id: tagId }).catch(() => {});
+        }
+      }
+
       onSaved();
     } catch (err: any) {
       setError(err.message);
     }
+  };
+
+  const handleAddTag = async () => {
+    if (!newTagName.trim()) return;
+    try {
+      const tag = await apiPost<Tag>('/tags', { name: newTagName.trim() });
+      setSelectedTags(prev => [...prev, tag.id]);
+      setNewTagName('');
+    } catch { /* tag might already exist */ }
   };
 
   return (
@@ -410,6 +453,34 @@ function EditItemForm({ item, onSaved, onCancel }: { item: TrackedItem; onSaved:
           <input value={displayName} onChange={e => setDisplayName(e.target.value)} style={inp} />
         </div>
       </div>
+
+      {/* Tag management */}
+      <div>
+        <label style={{ fontSize: 10, color: C.textSoft, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Tags</label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+          {allTags.map(tag => {
+            const selected = selectedTags.includes(tag.id);
+            return (
+              <button key={tag.id} onClick={() => {
+                setSelectedTags(prev => selected ? prev.filter(id => id !== tag.id) : [...prev, tag.id]);
+              }} style={{
+                padding: '3px 10px', borderRadius: 5, fontSize: 10, fontFamily: font, cursor: 'pointer',
+                background: selected ? C.accent + '18' : 'transparent',
+                border: `1px solid ${selected ? C.accent : C.border}`,
+                color: selected ? C.accent : C.textMid, fontWeight: selected ? 700 : 400,
+              }}>
+                {tag.name}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input value={newTagName} onChange={e => setNewTagName(e.target.value)} placeholder="New tag..." onKeyDown={e => e.key === 'Enter' && handleAddTag()}
+            style={{ ...inp, flex: 1, padding: '4px 8px', fontSize: 10 }} />
+          <button onClick={handleAddTag} style={{ padding: '4px 10px', background: C.bgInput, border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMid, fontSize: 10, cursor: 'pointer', fontFamily: font }}>Add</button>
+        </div>
+      </div>
+
       {error && <div style={{ fontSize: 12, color: '#c00', fontFamily: font }}>{error}</div>}
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={handleSave} style={{ padding: '5px 14px', background: C.accent, border: 'none', borderRadius: 6, color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: font }}>Save</button>
