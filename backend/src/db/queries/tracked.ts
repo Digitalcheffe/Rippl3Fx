@@ -8,6 +8,23 @@ function getMonthStart(dateStr?: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
+/** Compute live "today" for an item from the latest hourly row.
+ *  Hourly data is throwaway — this is just a preview until the daily rollup runs. */
+function computeCurrentDaily(trackedItemId: number): Record<string, any> | null {
+  const today = getLocalDate();
+  // Get the latest hourly row for today (period_start starts with today's date)
+  const row = db.prepare(`
+    SELECT tracked_item_id, 'daily' as period_type, ? as period_start, ? as period_end,
+           reach_value, interest_value, engagement_value, performance_score, platform
+    FROM tracked_hourly_metrics
+    WHERE tracked_item_id = ? AND period_start LIKE ?
+    ORDER BY period_start DESC LIMIT 1
+  `).get(today, today, trackedItemId, today + '%') as Record<string, any> | undefined;
+
+  if (!row || (row.reach_value === 0 && row.interest_value === 0 && row.engagement_value === 0)) return null;
+  return row;
+}
+
 /** Compute current week/month for an item by summing dailies. */
 function computeCurrentPeriod(trackedItemId: number, periodType: 'weekly' | 'monthly'): Record<string, any> | null {
   const today = getLocalDate();
@@ -46,8 +63,28 @@ export function getLatestTracked(trackedItemId: number, periodType: string): Rec
   ).get(trackedItemId, periodType) as Record<string, any> | undefined ?? null;
 }
 
-/** Get the two most recent tracked_metrics rows for velocity. For weekly/monthly, includes live current period. */
+/** Get the two most recent tracked_metrics rows for velocity. For daily, includes live today from hourly. For weekly/monthly, includes live current period. */
 export function getTrackedPair(trackedItemId: number, periodType: string): { current: Record<string, any> | null; previous: Record<string, any> | null } {
+  if (periodType === 'daily') {
+    // Try live today from hourly data first
+    const today = getLocalDate();
+    const stored = db.prepare(
+      'SELECT * FROM tracked_metrics WHERE tracked_item_id = ? AND period_type = ? ORDER BY period_start DESC LIMIT 2'
+    ).all(trackedItemId, periodType) as Record<string, any>[];
+
+    // If today already has a daily row (rollup ran), use stored data
+    if (stored.length > 0 && stored[0].period_start === today) {
+      return { current: stored[0], previous: stored[1] ?? null };
+    }
+
+    // No daily row for today yet — use live preview from hourly
+    const live = computeCurrentDaily(trackedItemId);
+    if (live) {
+      return { current: live, previous: stored[0] ?? null };
+    }
+    return { current: stored[0] ?? null, previous: stored[1] ?? null };
+  }
+
   if (periodType === 'weekly' || periodType === 'monthly') {
     // Try live current period first
     const live = computeCurrentPeriod(trackedItemId, periodType);
@@ -72,8 +109,27 @@ export function getTrackedPair(trackedItemId: number, periodType: string): { cur
   return { current: rows[0] ?? null, previous: rows[1] ?? null };
 }
 
-/** Get N most recent tracked_metrics rows for an item's trend chart. For weekly/monthly, includes live current period. */
+/** Get N most recent tracked_metrics rows for an item's trend chart. For daily, includes live today from hourly. For weekly/monthly, includes live current period. */
 export function getTrackedHistory(trackedItemId: number, periodType: string, limit: number = 7): Record<string, any>[] {
+  if (periodType === 'daily') {
+    const today = getLocalDate();
+    const stored = db.prepare(
+      'SELECT * FROM tracked_metrics WHERE tracked_item_id = ? AND period_type = ? ORDER BY period_start DESC LIMIT ?'
+    ).all(trackedItemId, periodType, limit) as Record<string, any>[];
+
+    // If today already has a daily row, use stored data as-is
+    if (stored.length > 0 && stored[0].period_start === today) {
+      return stored;
+    }
+
+    // No daily row for today — prepend live preview from hourly
+    const live = computeCurrentDaily(trackedItemId);
+    if (live) {
+      return [live, ...stored].slice(0, limit);
+    }
+    return stored;
+  }
+
   if (periodType === 'weekly' || periodType === 'monthly') {
     const live = computeCurrentPeriod(trackedItemId, periodType);
     const stored = db.prepare(
@@ -115,34 +171,34 @@ export function getTrackedByTag(tagName: string, periodType: string, limit: numb
   `).all(tagName, periodType, limit) as Record<string, any>[];
 }
 
-// ── Hourly queries (separate table: hourly_metrics) ──
+// ── Hourly queries (separate table: tracked_hourly_metrics) ──
 
-/** Get the two most recent hourly_metrics rows for velocity. */
+/** Get the two most recent tracked_hourly_metrics rows for velocity. */
 export function getHourlyPair(trackedItemId: number): { current: Record<string, any> | null; previous: Record<string, any> | null } {
   const rows = db.prepare(
-    'SELECT * FROM hourly_metrics WHERE tracked_item_id = ? ORDER BY period_start DESC LIMIT 2'
+    'SELECT * FROM tracked_hourly_metrics WHERE tracked_item_id = ? ORDER BY period_start DESC LIMIT 2'
   ).all(trackedItemId) as Record<string, any>[];
   return { current: rows[0] ?? null, previous: rows[1] ?? null };
 }
 
-/** Get N most recent hourly_metrics rows for an item's trend chart. */
+/** Get N most recent tracked_hourly_metrics rows for an item's trend chart. */
 export function getHourlyHistory(trackedItemId: number, limit: number = 7): Record<string, any>[] {
   return db.prepare(
-    'SELECT * FROM hourly_metrics WHERE tracked_item_id = ? ORDER BY period_start DESC LIMIT ?'
+    'SELECT * FROM tracked_hourly_metrics WHERE tracked_item_id = ? ORDER BY period_start DESC LIMIT ?'
   ).all(trackedItemId, limit) as Record<string, any>[];
 }
 
-/** Purge all tracked_metrics + hourly_metrics for an item (permanent delete). */
+/** Purge all tracked_metrics + tracked_hourly_metrics for an item (permanent delete). */
 export function purgeTrackedMetrics(trackedItemId: number): number {
-  db.prepare('DELETE FROM hourly_metrics WHERE tracked_item_id = ?').run(trackedItemId);
+  db.prepare('DELETE FROM tracked_hourly_metrics WHERE tracked_item_id = ?').run(trackedItemId);
   const result = db.prepare('DELETE FROM tracked_metrics WHERE tracked_item_id = ?').run(trackedItemId);
   return result.changes;
 }
 
-/** Purge all tracked_metrics + hourly_metrics for all items under an account (permanent account delete). */
+/** Purge all tracked_metrics + tracked_hourly_metrics for all items under an account (permanent account delete). */
 export function purgeTrackedMetricsByAccount(accountId: number): number {
   db.prepare(`
-    DELETE FROM hourly_metrics WHERE tracked_item_id IN (
+    DELETE FROM tracked_hourly_metrics WHERE tracked_item_id IN (
       SELECT id FROM tracked_items WHERE metric_account_id = ?
     )
   `).run(accountId);

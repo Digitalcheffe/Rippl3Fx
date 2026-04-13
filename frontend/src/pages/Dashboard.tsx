@@ -212,12 +212,13 @@ export default function Dashboard() {
 
           {/* Lane chart — use items if available, otherwise build from platform history */}
           {(() => {
+            const defaultHistory = new Array(timeRange === 'hourly' ? 24 : 7).fill(0);
             const chartItems = items.length > 0 ? items : Object.entries(data?.platforms || {}).map(([p, d]: [string, any]) => ({
               platform: p,
-              reachHistory: d.reachHistory || [0,0,0,0,0,0,0],
-              interestHistory: d.interestHistory || [0,0,0,0,0,0,0],
-              engagementHistory: d.engagementHistory || [0,0,0,0,0,0,0],
-              performanceHistory: d.performanceHistory || [0,0,0,0,0,0,0],
+              reachHistory: d.reachHistory || [...defaultHistory],
+              interestHistory: d.interestHistory || [...defaultHistory],
+              engagementHistory: d.engagementHistory || [...defaultHistory],
+              performanceHistory: d.performanceHistory || [...defaultHistory],
             }));
             return chartItems.length > 0 ? (
               <div style={{ marginTop: 12, marginBottom: 16 }}>

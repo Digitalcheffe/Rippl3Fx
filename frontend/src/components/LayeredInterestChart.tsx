@@ -8,7 +8,10 @@ function getLabels(range: string = 'daily', count: number = 7): string[] {
   const now = new Date();
   for (let i = count - 1; i >= 0; i--) {
     const d = new Date(now);
-    if (range === 'weekly') {
+    if (range === 'hourly') {
+      d.setHours(d.getHours() - i);
+      labels.push(i === 0 ? 'Now' : `${d.getHours()}:00`);
+    } else if (range === 'weekly') {
       d.setDate(d.getDate() - i * 7);
       const mon = new Date(d);
       const day = mon.getDay();
@@ -44,7 +47,8 @@ export interface LaneChartItem {
 
 function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneColor = false }: { items: LaneChartItem[]; width: number; height: number; lane: string; range?: string; useLaneColor?: boolean }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const labels = getLabels(range);
+  const dataLen = range === 'hourly' ? 24 : 7;
+  const labels = getLabels(range, dataLen);
   const padL = 52, padR = 12, padT = 22, padB = 24;
   const cW = width - padL - padR;
   const cH = height - padT - padB;
@@ -56,9 +60,9 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneC
   const platformData: Record<string, number[]> = {};
   for (const item of items) {
     const key = item.platform;
-    if (!platformData[key]) platformData[key] = new Array(7).fill(0);
+    if (!platformData[key]) platformData[key] = new Array(dataLen).fill(0);
     const hist = (item as any)[histKey] || item.interestHistory || [];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < dataLen; i++) {
       platformData[key][i] += hist[i] ?? 0;
     }
   }
@@ -67,9 +71,13 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneC
   const allValues = Object.values(platformData).flat();
   const maxVal = Math.max(...allValues, 1);
 
-  const toX = (i: number) => padL + (i / 6) * cW;
+  const maxIdx = dataLen - 1;
+  const toX = (i: number) => padL + (i / maxIdx) * cW;
   const toY = (v: number) => padT + cH - (v / maxVal) * cH;
   const slotW = cW / labels.length;
+
+  // For hourly (24 points), only show every 4th label to avoid crowding
+  const showLabel = (i: number) => range !== 'hourly' || i % 4 === 0 || i === maxIdx;
 
   return (
     <svg width={width} height={height} style={{ display: 'block' }}>
@@ -88,9 +96,9 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneC
       <text x={8} y={padT + cH / 2} fontSize="9" fill={laneColor} textAnchor="middle" fontFamily="monospace" transform={`rotate(-90, 8, ${padT + cH / 2})`}>{lane}</text>
 
       {/* X axis labels */}
-      {labels.map((l, i) => (
-        <text key={l} x={toX(i)} y={height - 4} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
-      ))}
+      {labels.map((l, i) => showLabel(i) ? (
+        <text key={i} x={toX(i)} y={height - 4} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
+      ) : null)}
 
       {/* Platform areas + lines */}
       {activePlatforms.map(platform => {
@@ -99,7 +107,7 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneC
         const color = useLaneColor ? laneColor : (C[displayKey as keyof typeof C] || C.accent) as string;
         const pts = data.map((v, i) => [toX(i), toY(v)]);
         const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-        const area = `${line} L${toX(6)},${padT + cH} L${toX(0)},${padT + cH} Z`;
+        const area = `${line} L${toX(maxIdx)},${padT + cH} L${toX(0)},${padT + cH} Z`;
 
         return (
           <g key={platform}>
@@ -164,7 +172,8 @@ const ALL_LANES = ['Reach', 'Interest', 'Engagement'];
 /** SVG chart showing all three lanes overlaid with their respective colors. */
 function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: LaneChartItem[]; width: number; height: number; range?: string }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const labels = getLabels(range);
+  const dataLen = range === 'hourly' ? 24 : 7;
+  const labels = getLabels(range, dataLen);
   const padL = 52, padR = 12, padT = 22, padB = 24;
   const cW = width - padL - padR;
   const cH = height - padT - padB;
@@ -172,11 +181,11 @@ function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: La
   // Sum history per lane across all items
   const laneData: Record<string, number[]> = {};
   for (const lane of ALL_LANES) {
-    laneData[lane] = new Array(7).fill(0);
+    laneData[lane] = new Array(dataLen).fill(0);
     const histKey = LANE_HISTORY_KEY[lane];
     for (const item of items) {
       const hist = (item as any)[histKey] || [];
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < dataLen; i++) {
         laneData[lane][i] += hist[i] ?? 0;
       }
     }
@@ -185,9 +194,13 @@ function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: La
   const allValues = Object.values(laneData).flat();
   const maxVal = Math.max(...allValues, 1);
 
-  const toX = (i: number) => padL + (i / 6) * cW;
+  const maxIdx = dataLen - 1;
+  const toX = (i: number) => padL + (i / maxIdx) * cW;
   const toY = (v: number) => padT + cH - (v / maxVal) * cH;
   const slotW = cW / labels.length;
+
+  // For hourly (24 points), only show every 4th label
+  const showLabel = (i: number) => range !== 'hourly' || i % 4 === 0 || i === maxIdx;
 
   return (
     <svg width={width} height={height} style={{ display: 'block' }}>
@@ -203,9 +216,9 @@ function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: La
       })}
 
       {/* X axis labels */}
-      {labels.map((l, i) => (
-        <text key={l} x={toX(i)} y={height - 4} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
-      ))}
+      {labels.map((l, i) => showLabel(i) ? (
+        <text key={i} x={toX(i)} y={height - 4} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
+      ) : null)}
 
       {/* Lane areas + lines */}
       {ALL_LANES.map((lane, laneIdx) => {
@@ -213,7 +226,7 @@ function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: La
         const color = LANE_COLORS[lane] || C.accent;
         const pts = data.map((v, i) => [toX(i), toY(v)]);
         const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-        const area = `${line} L${toX(6)},${padT + cH} L${toX(0)},${padT + cH} Z`;
+        const area = `${line} L${toX(maxIdx)},${padT + cH} L${toX(0)},${padT + cH} Z`;
         // Stagger labels above the line per lane to avoid overlap
         const labelYOffset = laneIdx === 0 ? -20 : laneIdx === 1 ? -14 : -8;
 
