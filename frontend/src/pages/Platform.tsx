@@ -217,11 +217,28 @@ export default function Platform() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+      {/* Row 1: Platform name + time toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 0 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>{name}</h1>
         </div>
+        <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 8, padding: 2 }}>
+          {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
+            <button key={range} onClick={() => setTimeRange(range)} style={{
+              padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
+              border: 'none', color: timeRange === range ? '#fff' : C.textMid,
+              fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
+              borderRadius: 6, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
+            }}>{range}</button>
+          ))}
+        </div>
+      </div>
+
+      <hr style={{ border: 'none', borderTop: `1px solid ${C.border}`, margin: '10px 0' }} />
+
+      {/* Row 2: Tag selector + Poll Now + Info */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {allTags.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -235,16 +252,8 @@ export default function Platform() {
               </select>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 8, padding: 2 }}>
-            {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
-              <button key={range} onClick={() => setTimeRange(range)} style={{
-                padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
-                border: 'none', color: timeRange === range ? '#fff' : C.textMid,
-                fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
-                borderRadius: 6, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
-              }}>{range}</button>
-            ))}
-          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={handlePollNow} disabled={polling} style={{
             padding: '5px 12px', background: C.up + '15',
             border: `1px solid ${C.up}55`, borderRadius: 6,

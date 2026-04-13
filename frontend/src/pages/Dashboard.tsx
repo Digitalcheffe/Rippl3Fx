@@ -158,36 +158,36 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
+      {/* Row 1: Title + time toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 0 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Dashboard</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>All Metrics</h1>
         </div>
-
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: C.textFaint, letterSpacing: 1.5, textTransform: 'uppercase', fontFamily: font }}>Tag</span>
-            <select value={activeTag} onChange={e => setActiveTag(e.target.value)} style={{
-              padding: '5px 12px', background: C.bgInput, border: `1px solid ${C.border}`,
-              borderRadius: 7, color: C.text, fontSize: 12, fontFamily: font, cursor: 'pointer', outline: 'none',
-            }}>
-              <option value="All">All</option>
-              {tags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', background: C.bgInput, borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-            {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
-              <button key={range} onClick={() => setTimeRange(range)} style={{
-                padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
-                border: 'none', color: timeRange === range ? '#fff' : C.textMid,
-                fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
-                cursor: 'pointer', fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5,
-              }}>{range}</button>
-            ))}
-          </div>
+        <div style={{ display: 'flex', background: C.bgInput, borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+          {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
+            <button key={range} onClick={() => setTimeRange(range)} style={{
+              padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
+              border: 'none', color: timeRange === range ? '#fff' : C.textMid,
+              fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
+              cursor: 'pointer', fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5,
+            }}>{range}</button>
+          ))}
         </div>
+      </div>
+
+      <hr style={{ border: 'none', borderTop: `1px solid ${C.border}`, margin: '10px 0' }} />
+
+      {/* Row 2: Tag selector */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16 }}>
+        <span style={{ fontSize: 10, color: C.textFaint, letterSpacing: 1.5, textTransform: 'uppercase', fontFamily: font }}>Tag</span>
+        <select value={activeTag} onChange={e => setActiveTag(e.target.value)} style={{
+          padding: '5px 12px', background: C.bgInput, border: `1px solid ${C.border}`,
+          borderRadius: 7, color: C.text, fontSize: 12, fontFamily: font, cursor: 'pointer', outline: 'none',
+        }}>
+          <option value="All">All</option>
+          {tags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+        </select>
       </div>
 
       {loading ? (
