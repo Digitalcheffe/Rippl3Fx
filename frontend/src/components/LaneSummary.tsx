@@ -67,30 +67,30 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
             transition: 'all 0.2s ease',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <div style={{ fontSize: 10, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontFamily: font }}>{lane}<LaneTooltip lane={lane} platform={platform} /></div>
+              <div style={{ fontSize: 12, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontWeight: 700, fontFamily: font }}>{lane}<LaneTooltip lane={lane} platform={platform} /></div>
               {peaks && (() => {
                 const peakKey = `${lane.toLowerCase()}_peak` as keyof typeof peaks;
                 const peakVal = peaks[peakKey] as number;
                 return peakVal > 0 ? (
-                  <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>Peak: {fmt(peakVal)}</div>
+                  <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>Peak: {fmt(peakVal)}</div>
                 ) : null;
               })()}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>{timeLabel}</div>
+                <div style={{ fontSize: 12, color: C.textMid, fontFamily: font, textTransform: 'capitalize' }}>{timeLabel}</div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
               </div>
               {d.velocity !== 0 ? (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>change</div>
+                    <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>Change</div>
                     <div style={{ fontSize: 22, fontWeight: 900, color: vc, fontFamily: font, lineHeight: 1 }}>
                       {velSign(d.velocity)}{fmt(Math.abs(d.velocity))}
                     </div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>% change</div>
+                    <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>% Change</div>
                     <div style={{ fontSize: 22, fontWeight: 900, color: vc, fontFamily: font, lineHeight: 1 }}>
                       {(() => { const prev = d.current - d.velocity; return prev !== 0 ? `${d.velocity > 0 ? '+' : ''}${((d.velocity / prev) * 100).toFixed(1)}%` : 'new'; })()}
                     </div>
