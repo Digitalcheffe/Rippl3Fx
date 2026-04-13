@@ -30,6 +30,7 @@ interface Tag {
 // Map platform snapshot metrics to Reach/Interest/Engagement lanes
 function mapToLanes(item: DashboardItem): Record<string, { current: number; history: number[]; velocity: number }> {
   const snap = item.latestSnapshot;
+  const v = (item as any).velocity || { reach: 0, interest: 0, engagement: 0 };
   if (!snap) {
     return {
       Reach: { current: 0, history: [0, 0, 0, 0, 0, 0, 0], velocity: 0 },
@@ -41,27 +42,27 @@ function mapToLanes(item: DashboardItem): Record<string, { current: number; hist
   switch (item.platform) {
     case 'github':
       return {
-        Reach: { current: (snap.traffic_views || 0) + (snap.traffic_uniques || 0), history: item.interestHistory, velocity: 0 },
-        Interest: { current: (snap.stars || 0) + (snap.forks || 0), history: item.interestHistory, velocity: 0 },
-        Engagement: { current: (snap.clones || 0) + (snap.clones_uniques || 0), history: item.interestHistory, velocity: 0 },
+        Reach: { current: (snap.traffic_views || 0) + (snap.traffic_uniques || 0), history: item.interestHistory, velocity: v.reach },
+        Interest: { current: (snap.stars || 0) + (snap.forks || 0), history: item.interestHistory, velocity: v.interest },
+        Engagement: { current: (snap.clones || 0) + (snap.clones_uniques || 0), history: item.interestHistory, velocity: v.engagement },
       };
     case 'reddit':
       return {
-        Reach: { current: snap.view_count || 0, history: item.interestHistory, velocity: 0 },
-        Interest: { current: snap.upvotes || 0, history: item.interestHistory, velocity: 0 },
-        Engagement: { current: snap.comment_count || 0, history: item.interestHistory, velocity: 0 },
+        Reach: { current: snap.view_count || 0, history: item.interestHistory, velocity: v.reach },
+        Interest: { current: snap.upvotes || 0, history: item.interestHistory, velocity: v.interest },
+        Engagement: { current: snap.comment_count || 0, history: item.interestHistory, velocity: v.engagement },
       };
     case 'ga4':
       return {
-        Reach: { current: snap.pageviews || 0, history: item.interestHistory, velocity: 0 },
-        Interest: { current: snap.users || 0, history: item.interestHistory, velocity: 0 },
-        Engagement: { current: snap.sessions || 0, history: item.interestHistory, velocity: 0 },
+        Reach: { current: snap.pageviews || 0, history: item.interestHistory, velocity: v.reach },
+        Interest: { current: snap.users || 0, history: item.interestHistory, velocity: v.interest },
+        Engagement: { current: snap.sessions || 0, history: item.interestHistory, velocity: v.engagement },
       };
     case 'bing':
       return {
-        Reach: { current: snap.impressions || 0, history: item.interestHistory, velocity: 0 },
-        Interest: { current: snap.clicks || 0, history: item.interestHistory, velocity: 0 },
-        Engagement: { current: snap.ctr ? Math.round(snap.ctr * 1000) / 10 : 0, history: item.interestHistory, velocity: 0 },
+        Reach: { current: snap.impressions || 0, history: item.interestHistory, velocity: v.reach },
+        Interest: { current: snap.clicks || 0, history: item.interestHistory, velocity: v.interest },
+        Engagement: { current: snap.ctr ? Math.round(snap.ctr * 1000) / 10 : 0, history: item.interestHistory, velocity: v.engagement },
       };
     default:
       return {
@@ -92,14 +93,17 @@ export default function Dashboard() {
   const [activeTag, setActiveTag] = useState('All');
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [loading, setLoading] = useState(true);
+  const [weights, setWeights] = useState<{ reach: number; interest: number; engagement: number } | null>(null);
+  const [activeChart, setActiveChart] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (activeTag !== 'All') params.set('tag', activeTag);
       params.set('range', timeRange);
-      const data = await apiGet<{ items: DashboardItem[] }>(`/dashboard?${params}`);
+      const data = await apiGet<{ items: DashboardItem[]; weights: { reach: number; interest: number; engagement: number } }>(`/dashboard?${params}`);
       setItems(data.items);
+      if (data.weights) setWeights(data.weights);
     } catch { /* ignore */ }
     setLoading(false);
   }, [activeTag, timeRange]);
@@ -146,12 +150,18 @@ export default function Dashboard() {
         }
       }
     }
+    // Compute platform-level performance score
+    const avgPerf = platformItems.length > 0
+      ? platformItems.reduce((s, i) => s + ((i as any).performanceScore || 0), 0) / platformItems.length
+      : 0;
+
     return {
       id: 0,
       platform,
       display_name: `${platform} — ${platformItems.length} item${platformItems.length > 1 ? 's' : ''}`,
       tags: [],
       lanes,
+      performanceScore: avgPerf,
     };
   });
 
@@ -220,23 +230,44 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          {/* Lane summary */}
-          <LaneSummary items={statItems} />
+          {/* Lane summary — clickable cards */}
+          <LaneSummary
+            items={statItems}
+            performanceScore={items.length > 0 ? items.reduce((s, i) => s + ((i as any).performanceScore || 0), 0) / items.length : undefined}
+            performanceVelocity={items.length > 0 ? items.reduce((s, i) => s + ((i as any).performanceVelocity || 0), 0) / items.length : undefined}
+            weights={weights || undefined}
+            activeCard={activeChart}
+            onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
+          />
 
-          {/* Performance trend */}
-          <PerformanceTrend items={items} />
-
-          {/* Layered interest chart */}
-          <LayeredInterestChart items={items} tag={activeTag !== 'All' ? activeTag : undefined} />
+          {/* Collapsible chart panel */}
+          <div style={{
+            maxHeight: activeChart ? 400 : 0,
+            opacity: activeChart ? 1 : 0,
+            overflow: 'hidden',
+            transition: 'max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease',
+            marginBottom: activeChart ? 20 : 0,
+          }}>
+            {activeChart === 'Performance' ? (
+              <PerformanceTrend items={items} onClose={() => setActiveChart(null)} />
+            ) : activeChart ? (
+              <LayeredInterestChart
+                items={items}
+                lane={activeChart}
+                tag={activeTag !== 'All' ? activeTag : undefined}
+                onClose={() => setActiveChart(null)}
+              />
+            ) : null}
+          </div>
 
           {/* Stat cards grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: showingTagged ? 'repeat(auto-fill, minmax(360px, 1fr))' : `repeat(${Math.min(platformStatItems.length, 3)}, 1fr)`, gap: 14 }}>
             {showingTagged
               ? statItems.map((item, i) => (
                   <StatCard key={item.id} item={item} index={i} />
                 ))
               : platformStatItems.map((item, i) => (
-                  <StatCard key={item.platform} item={item} index={i} />
+                  <StatCard key={item.platform} item={item} index={i} onClick={() => navigate(`/platform/${item.platform.toLowerCase()}`)} />
                 ))
             }
           </div>

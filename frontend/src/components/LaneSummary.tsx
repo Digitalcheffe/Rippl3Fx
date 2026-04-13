@@ -23,7 +23,16 @@ interface LaneSummaryItem {
   lanes: Record<string, { current: number; velocity: number }>;
 }
 
-export default function LaneSummary({ items }: { items: LaneSummaryItem[] }) {
+interface Props {
+  items: LaneSummaryItem[];
+  performanceScore?: number;
+  performanceVelocity?: number;
+  weights?: { reach: number; interest: number; engagement: number };
+  activeCard?: string | null;
+  onCardClick?: (lane: string) => void;
+}
+
+export default function LaneSummary({ items, performanceScore, performanceVelocity, weights, activeCard, onCardClick }: Props) {
   const totals: Record<string, LaneData> = {};
   for (const lane of LANES) {
     totals[lane] = {
@@ -32,18 +41,26 @@ export default function LaneSummary({ items }: { items: LaneSummaryItem[] }) {
     };
   }
 
+  const pv = performanceVelocity ?? 0;
+
   return (
     <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
       {LANES.map(lane => {
         const d = totals[lane];
         const vc = velColor(d.velocity);
         const laneColor = C[lane as keyof typeof C] as string;
+        const isActive = activeCard === lane;
         return (
-          <div key={lane} style={{
-            flex: 1, minWidth: 160,
-            background: C.bgCard, border: `1px solid ${laneColor}30`,
+          <div key={lane} onClick={() => onCardClick?.(lane)} style={{
+            flex: 1, minWidth: 140,
+            background: isActive ? laneColor + '08' : C.bgCard,
+            borderLeft: `1px solid ${isActive ? laneColor + '60' : laneColor + '30'}`,
+            borderRight: `1px solid ${isActive ? laneColor + '60' : laneColor + '30'}`,
+            borderBottom: `1px solid ${isActive ? laneColor + '60' : laneColor + '30'}`,
             borderTop: `3px solid ${laneColor}`, borderRadius: 10,
-            padding: '12px 16px', boxShadow: '0 2px 8px rgba(30,58,95,0.06)',
+            padding: '12px 16px', boxShadow: isActive ? `0 4px 16px ${laneColor}20` : '0 2px 8px rgba(30,58,95,0.06)',
+            cursor: onCardClick ? 'pointer' : 'default',
+            transition: 'all 0.2s ease',
           }}>
             <div style={{ fontSize: 10, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>{lane}</div>
             <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
@@ -53,6 +70,34 @@ export default function LaneSummary({ items }: { items: LaneSummaryItem[] }) {
           </div>
         );
       })}
+
+      {performanceScore != null && (() => {
+        const isActive = activeCard === 'Performance';
+        return (
+        <div onClick={() => onCardClick?.('Performance')} style={{
+          flex: 1, minWidth: 140,
+          background: isActive ? C.accent + '08' : C.bgCard,
+          borderLeft: `1px solid ${isActive ? C.accent + '60' : C.accent + '30'}`,
+          borderRight: `1px solid ${isActive ? C.accent + '60' : C.accent + '30'}`,
+          borderBottom: `1px solid ${isActive ? C.accent + '60' : C.accent + '30'}`,
+          borderTop: `3px solid ${C.accent}`, borderRadius: 10,
+          padding: '12px 16px', boxShadow: isActive ? `0 4px 16px ${C.accent}20` : '0 2px 8px rgba(30,58,95,0.06)',
+          cursor: onCardClick ? 'pointer' : 'default',
+          transition: 'all 0.2s ease',
+        }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: C.accent, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>Performance</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{performanceScore.toFixed(1)}%</div>
+          <div style={{ fontSize: 11, color: velColor(pv), fontWeight: 700, fontFamily: font, marginTop: 4 }}>
+            {pv !== 0 ? `${velArrow(pv)} ${velSign(pv)}${Math.abs(pv).toFixed(1)} today` : 'No change yet'}
+          </div>
+          {weights && (
+            <div style={{ fontSize: 8, color: C.textFaint, fontFamily: font, marginTop: 4 }}>
+              R {Math.round(weights.reach * 100)}% · I {Math.round(weights.interest * 100)}% · E {Math.round(weights.engagement * 100)}%
+            </div>
+          )}
+        </div>
+        );
+      })()}
     </div>
   );
 }

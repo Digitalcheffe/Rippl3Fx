@@ -8,6 +8,7 @@ import DiscoveryPanel from '../components/DiscoveryPanel';
 import AccountStats from '../components/AccountStats';
 import LaneSummary from '../components/LaneSummary';
 import PerformanceTrend from '../components/PerformanceTrend';
+import LayeredInterestChart from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
 
 const font = "'DM Mono', monospace";
@@ -40,12 +41,13 @@ interface Tag {
 function mapItemToLanes(item: any, plat: string): Record<string, { current: number; history: number[]; velocity: number }> {
   const snap = item.latestSnapshot;
   const hist = item.interestHistory || [0,0,0,0,0,0,0];
+  const v = item.velocity || { reach: 0, interest: 0, engagement: 0 };
   if (!snap) return { Reach: { current: 0, history: hist, velocity: 0 }, Interest: { current: 0, history: hist, velocity: 0 }, Engagement: { current: 0, history: hist, velocity: 0 } };
   switch (plat) {
-    case 'github': return { Reach: { current: (snap.traffic_views||0)+(snap.traffic_uniques||0), history: hist, velocity: 0 }, Interest: { current: (snap.stars||0)+(snap.forks||0), history: hist, velocity: 0 }, Engagement: { current: (snap.clones||0)+(snap.clones_uniques||0), history: hist, velocity: 0 } };
-    case 'reddit': return { Reach: { current: snap.view_count||0, history: hist, velocity: 0 }, Interest: { current: snap.upvotes||0, history: hist, velocity: 0 }, Engagement: { current: snap.comment_count||0, history: hist, velocity: 0 } };
-    case 'ga4': return { Reach: { current: snap.pageviews||0, history: hist, velocity: 0 }, Interest: { current: snap.users||0, history: hist, velocity: 0 }, Engagement: { current: snap.sessions||0, history: hist, velocity: 0 } };
-    case 'bing': return { Reach: { current: snap.impressions||0, history: hist, velocity: 0 }, Interest: { current: snap.clicks||0, history: hist, velocity: 0 }, Engagement: { current: snap.ctr?Math.round(snap.ctr*1000)/10:0, history: hist, velocity: 0 } };
+    case 'github': return { Reach: { current: (snap.traffic_views||0)+(snap.traffic_uniques||0), history: hist, velocity: v.reach }, Interest: { current: (snap.stars||0)+(snap.forks||0), history: hist, velocity: v.interest }, Engagement: { current: (snap.clones||0)+(snap.clones_uniques||0), history: hist, velocity: v.engagement } };
+    case 'reddit': return { Reach: { current: snap.view_count||0, history: hist, velocity: v.reach }, Interest: { current: snap.upvotes||0, history: hist, velocity: v.interest }, Engagement: { current: snap.comment_count||0, history: hist, velocity: v.engagement } };
+    case 'ga4': return { Reach: { current: snap.pageviews||0, history: hist, velocity: v.reach }, Interest: { current: snap.users||0, history: hist, velocity: v.interest }, Engagement: { current: snap.sessions||0, history: hist, velocity: v.engagement } };
+    case 'bing': return { Reach: { current: snap.impressions||0, history: hist, velocity: v.reach }, Interest: { current: snap.clicks||0, history: hist, velocity: v.interest }, Engagement: { current: snap.ctr?Math.round(snap.ctr*1000)/10:0, history: hist, velocity: v.engagement } };
     default: return { Reach: { current: 0, history: hist, velocity: 0 }, Interest: { current: 0, history: hist, velocity: 0 }, Engagement: { current: 0, history: hist, velocity: 0 } };
   }
 }
@@ -72,6 +74,7 @@ export default function Platform() {
   const [loading, setLoading] = useState(true);
   const [dashboardItems, setDashboardItems] = useState<any[]>([]);
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
+  const [activeChart, setActiveChart] = useState<string | null>(null);
 
   // Load accounts for this platform
   useEffect(() => {
@@ -124,12 +127,13 @@ export default function Platform() {
   // Map dashboard items to lane data for LaneSummary
   const laneSummaryItems = dashboardItems.map(item => {
     const snap = item.latestSnapshot;
+    const v = item.velocity || { reach: 0, interest: 0, engagement: 0 };
     if (!snap) return { lanes: { Reach: { current: 0, velocity: 0 }, Interest: { current: 0, velocity: 0 }, Engagement: { current: 0, velocity: 0 } } };
     switch (platform) {
-      case 'github': return { lanes: { Reach: { current: (snap.traffic_views || 0) + (snap.traffic_uniques || 0), velocity: 0 }, Interest: { current: (snap.stars || 0) + (snap.forks || 0), velocity: 0 }, Engagement: { current: (snap.clones || 0) + (snap.clones_uniques || 0), velocity: 0 } } };
-      case 'reddit': return { lanes: { Reach: { current: snap.view_count || 0, velocity: 0 }, Interest: { current: snap.upvotes || 0, velocity: 0 }, Engagement: { current: snap.comment_count || 0, velocity: 0 } } };
-      case 'ga4': return { lanes: { Reach: { current: snap.pageviews || 0, velocity: 0 }, Interest: { current: snap.users || 0, velocity: 0 }, Engagement: { current: snap.sessions || 0, velocity: 0 } } };
-      case 'bing': return { lanes: { Reach: { current: snap.impressions || 0, velocity: 0 }, Interest: { current: snap.clicks || 0, velocity: 0 }, Engagement: { current: snap.ctr ? Math.round(snap.ctr * 1000) / 10 : 0, velocity: 0 } } };
+      case 'github': return { lanes: { Reach: { current: (snap.traffic_views || 0) + (snap.traffic_uniques || 0), velocity: v.reach }, Interest: { current: (snap.stars || 0) + (snap.forks || 0), velocity: v.interest }, Engagement: { current: (snap.clones || 0) + (snap.clones_uniques || 0), velocity: v.engagement } } };
+      case 'reddit': return { lanes: { Reach: { current: snap.view_count || 0, velocity: v.reach }, Interest: { current: snap.upvotes || 0, velocity: v.interest }, Engagement: { current: snap.comment_count || 0, velocity: v.engagement } } };
+      case 'ga4': return { lanes: { Reach: { current: snap.pageviews || 0, velocity: v.reach }, Interest: { current: snap.users || 0, velocity: v.interest }, Engagement: { current: snap.sessions || 0, velocity: v.engagement } } };
+      case 'bing': return { lanes: { Reach: { current: snap.impressions || 0, velocity: v.reach }, Interest: { current: snap.clicks || 0, velocity: v.interest }, Engagement: { current: snap.ctr ? Math.round(snap.ctr * 1000) / 10 : 0, velocity: v.engagement } } };
       default: return { lanes: { Reach: { current: 0, velocity: 0 }, Interest: { current: 0, velocity: 0 }, Engagement: { current: 0, velocity: 0 } } };
     }
   });
@@ -220,8 +224,30 @@ export default function Platform() {
           {/* Platform-level lanes + performance */}
           {laneSummaryItems.length > 0 && (
             <>
-              <LaneSummary items={laneSummaryItems} />
-              <PerformanceTrend items={dashboardItems} platform={name} />
+              <LaneSummary
+                items={laneSummaryItems}
+                performanceScore={dashboardItems.length > 0 ? dashboardItems.reduce((s: number, i: any) => s + (i.performanceScore || 0), 0) / dashboardItems.length : undefined}
+                performanceVelocity={dashboardItems.length > 0 ? dashboardItems.reduce((s: number, i: any) => s + (i.performanceVelocity || 0), 0) / dashboardItems.length : undefined}
+                activeCard={activeChart}
+                onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
+              />
+              <div style={{
+                maxHeight: activeChart ? 400 : 0,
+                opacity: activeChart ? 1 : 0,
+                overflow: 'hidden',
+                transition: 'max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease',
+                marginBottom: activeChart ? 20 : 0,
+              }}>
+                {activeChart === 'Performance' ? (
+                  <PerformanceTrend items={dashboardItems} platform={name} onClose={() => setActiveChart(null)} />
+                ) : activeChart ? (
+                  <LayeredInterestChart
+                    items={dashboardItems}
+                    lane={activeChart}
+                    onClose={() => setActiveChart(null)}
+                  />
+                ) : null}
+              </div>
             </>
           )}
 

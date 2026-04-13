@@ -35,6 +35,7 @@ export interface StatCardItem {
   display_name: string;
   tags: string[];
   lanes: Record<string, LaneData>;
+  performanceScore?: number;
 }
 
 interface LaneRowProps {
@@ -62,12 +63,14 @@ function LaneRow({ lane, data, compact = false }: LaneRowProps) {
   );
 }
 
-export default function StatCard({ item, index = 0 }: { item: StatCardItem; index?: number }) {
+export default function StatCard({ item, index = 0, onClick }: { item: StatCardItem; index?: number; onClick?: () => void }) {
   const color = (C[item.platform as keyof typeof C] || C.accent) as string;
 
   return (
     <div
+      onClick={onClick}
       style={{
+        cursor: onClick ? 'pointer' : 'default',
         background: C.bgCard,
         border: `1px solid ${C.border}`,
         borderTop: `3px solid ${color}`,
@@ -115,6 +118,17 @@ export default function StatCard({ item, index = 0 }: { item: StatCardItem; inde
           return <LaneRow key={lane} lane={lane} data={data} />;
         })}
       </div>
+
+      {/* Performance score */}
+      {item.performanceScore != null && item.performanceScore > 0 && (
+        <>
+          <div style={{ height: 1, background: C.border }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 9, color: C.accent, textTransform: 'uppercase', letterSpacing: 1, fontFamily: font, fontWeight: 700 }}>Performance</span>
+            <span style={{ fontSize: 14, fontWeight: 900, color: C.accent, fontFamily: font }}>{item.performanceScore.toFixed(1)}%</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -21,16 +21,34 @@ function getAccountCredentials(accountId: number): { credentials: any; platform:
   return { credentials: decryptCredentials(row.credentials), platform: row.platform };
 }
 
-function updateInterestScore(trackedItemId: number, platform: string, date: string, columns: string[]): void {
+const LANE_CALC: Record<string, { reach: string[]; interest: string[]; engagement: string[] }> = {
+  github: { reach: ['traffic_views', 'traffic_uniques'], interest: ['stars', 'forks'], engagement: ['clones', 'clones_uniques'] },
+  reddit: { reach: ['view_count'], interest: ['upvotes'], engagement: ['comment_count'] },
+  ga4:    { reach: ['pageviews'], interest: ['users'], engagement: ['sessions'] },
+  bing:   { reach: ['impressions'], interest: ['clicks'], engagement: [] },
+};
+
+function recalcDailyScores(trackedItemId: number, platform: string, date: string, columns: string[]): void {
   const table = `${platform}_daily`;
   const row = db.prepare(
     `SELECT ${columns.join(', ')} FROM ${table} WHERE tracked_item_id = ? AND period_start = ?`
   ).get(trackedItemId, date) as Record<string, number> | undefined;
   if (!row) return;
+
   const metrics: Record<string, number> = {};
   for (const col of columns) metrics[col] = row[col] ?? 0;
-  const score = computeInterestScore(trackedItemId, platform, metrics);
-  db.prepare(`UPDATE ${table} SET interest_score = ? WHERE tracked_item_id = ? AND period_start = ?`).run(score, trackedItemId, date);
+
+  // Recalculate interest score
+  const interestScore = computeInterestScore(trackedItemId, platform, metrics);
+
+  // Recalculate reach and engagement scores from lane mappings
+  const lc = LANE_CALC[platform];
+  const reachScore = lc ? lc.reach.reduce((s, k) => s + (metrics[k] ?? 0), 0) : 0;
+  const engagementScore = lc ? lc.engagement.reduce((s, k) => s + (metrics[k] ?? 0), 0) : 0;
+
+  db.prepare(
+    `UPDATE ${table} SET reach_score = ?, interest_score = ?, engagement_score = ? WHERE tracked_item_id = ? AND period_start = ?`
+  ).run(reachScore, interestScore, engagementScore, trackedItemId, date);
 }
 
 /** Backfill 14 days of GitHub traffic data for a tracked repo. */
@@ -85,7 +103,7 @@ async function backfillGithub(trackedItemId: number, accountId: number, platform
       date, date
     );
 
-    updateInterestScore(trackedItemId, 'github', date, columns);
+    recalcDailyScores(trackedItemId, 'github', date, columns);
   }
 
   console.log(`[Backfill] GitHub: inserted ${dates.length} daily rows for ${platformIdentifier}`);
@@ -145,7 +163,7 @@ async function backfillGA4(trackedItemId: number, accountId: number, platformIde
       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `).run(trackedItemId, sessions, pageviews, users, engagementRate, pageviews, sessions, date, date);
 
-    updateInterestScore(trackedItemId, 'ga4', date, columns);
+    recalcDailyScores(trackedItemId, 'ga4', date, columns);
   }
 
   console.log(`[Backfill] GA4: inserted up to ${dates.length} daily rows for ${platformIdentifier}`);
@@ -183,7 +201,7 @@ async function backfillBing(trackedItemId: number, accountId: number, platformId
       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `).run(trackedItemId, impressions, clicks, ctr, avgRank, impressions, clicks, date, date);
 
-    updateInterestScore(trackedItemId, 'bing', date, columns);
+    recalcDailyScores(trackedItemId, 'bing', date, columns);
   }
 
   console.log(`[Backfill] Bing: inserted daily rows for ${platformIdentifier}`);
