@@ -7,7 +7,6 @@ import PerformanceTrend from '../components/PerformanceTrend';
 import LayeredInterestChart from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
 import SkeletonCard from '../components/SkeletonCard';
-import { LaneInfoButton, LaneInfoPanel } from '../components/LaneInfo';
 
 const font = "'DM Mono', monospace";
 
@@ -37,6 +36,23 @@ interface PlatformData {
   performanceScore: number;
   velocity: { reach: number; interest: number; engagement: number };
   performanceVelocity: number;
+  periodStart?: string;
+  periodEnd?: string;
+  peaks?: { reach_peak: number; interest_peak: number; engagement_peak: number };
+}
+
+/** Format a period date range for display (e.g., "Apr 7–13"). */
+function formatPeriodLabel(range: string, periodStart?: string | null, periodEnd?: string | null): string {
+  if ((range === 'weekly' || range === 'monthly') && periodStart && periodEnd) {
+    const s = new Date(periodStart + 'T12:00:00');
+    const e = new Date(periodEnd + 'T12:00:00');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    if (s.getMonth() === e.getMonth()) {
+      return `${months[s.getMonth()]} ${s.getDate()}–${e.getDate()}`;
+    }
+    return `${months[s.getMonth()]} ${s.getDate()} – ${months[e.getMonth()]} ${e.getDate()}`;
+  }
+  return { hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[range] || range;
 }
 
 interface DashboardResponse {
@@ -49,6 +65,7 @@ interface DashboardResponse {
     performanceScore: number;
     velocity: { reach: number; interest: number; engagement: number };
     performanceVelocity: number;
+    peaks?: { reach_peak: number; interest_peak: number; engagement_peak: number };
   };
   distribution: Record<string, { reach: number; interest: number; engagement: number }>;
   weights: { reach: number; interest: number; engagement: number };
@@ -71,7 +88,6 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<string | null>(null);
-  const [showInfo, setShowInfo] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -142,91 +158,87 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
+      {/* Row 1: Title + time toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 0 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Dashboard</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>All Metrics</h1>
         </div>
-
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: C.textFaint, letterSpacing: 1.5, textTransform: 'uppercase', fontFamily: font }}>Tag</span>
-            <select value={activeTag} onChange={e => setActiveTag(e.target.value)} style={{
-              padding: '5px 12px', background: C.bgInput, border: `1px solid ${C.border}`,
-              borderRadius: 7, color: C.text, fontSize: 12, fontFamily: font, cursor: 'pointer', outline: 'none',
-            }}>
-              <option value="All">All</option>
-              {tags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', background: C.bgInput, borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-            {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
-              <button key={range} onClick={() => setTimeRange(range)} style={{
-                padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
-                border: 'none', color: timeRange === range ? '#fff' : C.textMid,
-                fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
-                cursor: 'pointer', fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5,
-              }}>{range}</button>
-            ))}
-          </div>
+        <div style={{ display: 'flex', background: C.bgInput, borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+          {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
+            <button key={range} onClick={() => setTimeRange(range)} style={{
+              padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
+              border: 'none', color: timeRange === range ? '#fff' : C.textMid,
+              fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
+              cursor: 'pointer', fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5,
+            }}>{range}</button>
+          ))}
         </div>
+      </div>
+
+      <hr style={{ border: 'none', borderTop: `3px solid ${C.borderMid}`, margin: '10px 0' }} />
+
+      {/* Row 2: Tag selector */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16 }}>
+        <span style={{ fontSize: 10, color: C.textFaint, letterSpacing: 1.5, textTransform: 'uppercase', fontFamily: font }}>Tag</span>
+        <select value={activeTag} onChange={e => setActiveTag(e.target.value)} style={{
+          padding: '5px 12px', background: C.bgInput, border: `1px solid ${C.border}`,
+          borderRadius: 7, color: C.text, fontSize: 12, fontFamily: font, cursor: 'pointer', outline: 'none',
+        }}>
+          <option value="All">All</option>
+          {tags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+        </select>
       </div>
 
       {loading ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
           {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
         </div>
-      ) : items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: C.textSoft, fontSize: 13, fontFamily: font }}>
-          {activeTag === 'All' ? (
-            <>No tracked items yet.{' '}<span onClick={() => navigate('/settings')} style={{ color: C.accent, cursor: 'pointer', textDecoration: 'underline' }}>Add some in Settings</span>.</>
-          ) : (
-            <>No items tagged "{activeTag}" yet.</>
-          )}
-        </div>
       ) : (
         <>
-          {/* Lane summary — clickable cards */}
-          <LaneSummary
-            items={laneSummaryItems}
-            performanceScore={totals?.performanceScore}
-            performanceVelocity={totals?.performanceVelocity}
-            weights={weights}
-            activeCard={activeChart}
-            onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
-            timeLabel={{ hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[timeRange]}
-            peaks={totals?.peaks}
-          />
+          {/* Lane summary — always show platform-level data */}
+          {laneSummaryItems.length > 0 && (
+            <LaneSummary
+              items={laneSummaryItems}
+              performanceScore={totals?.performanceScore}
+              performanceVelocity={totals?.performanceVelocity}
+              weights={weights}
+              activeCard={activeChart}
+              onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
+              timeLabel={formatPeriodLabel(timeRange, Object.values(data?.platforms || {})[0]?.periodStart, Object.values(data?.platforms || {})[0]?.periodEnd)}
+              peaks={totals?.peaks}
+            />
+          )}
 
-          {/* Collapsible chart panel */}
-          <div style={{
-            maxHeight: activeChart ? 400 : 0,
-            opacity: activeChart ? 1 : 0,
-            overflow: 'hidden',
-            transition: 'max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease',
-            marginBottom: activeChart ? 20 : 0,
-          }}>
-            {activeChart === 'Performance' ? (
-              <PerformanceTrend items={items} onClose={() => setActiveChart(null)} range={timeRange} />
-            ) : activeChart ? (
-              <LayeredInterestChart
-                items={items}
-                lane={activeChart}
-                tag={activeTag !== 'All' ? activeTag : undefined}
-                onClose={() => setActiveChart(null)}
-                range={timeRange}
-              />
-            ) : null}
-          </div>
+          {/* Lane chart — use items if available, otherwise build from platform history */}
+          {(() => {
+            const chartItems = items.length > 0 ? items : Object.entries(data?.platforms || {}).map(([p, d]: [string, any]) => ({
+              platform: p,
+              reachHistory: d.reachHistory || [0,0,0,0,0,0,0],
+              interestHistory: d.interestHistory || [0,0,0,0,0,0,0],
+              engagementHistory: d.engagementHistory || [0,0,0,0,0,0,0],
+              performanceHistory: d.performanceHistory || [0,0,0,0,0,0,0],
+            }));
+            return chartItems.length > 0 ? (
+              <div style={{ marginTop: 12, marginBottom: 16 }}>
+                <LayeredInterestChart
+                  items={chartItems}
+                  lane={activeChart || 'all'}
+                  tag={activeTag !== 'All' ? activeTag : undefined}
+                  range={timeRange}
+                />
+              </div>
+            ) : null;
+          })()}
 
-          {/* Platform / item stat cards */}
+          {/* Platform stat cards (always) or tagged item cards (when tag selected) */}
           <div style={{ display: 'grid', gridTemplateColumns: showingTagged ? 'repeat(auto-fill, minmax(360px, 1fr))' : `repeat(${Math.min(platformStatItems.length, 3)}, 1fr)`, gap: 14 }}>
             {showingTagged
-              ? tagStatItems.map((item, i) => (
-                  <StatCard key={item.id} item={item} index={i} />
-                ))
+              ? tagStatItems.length > 0
+                ? tagStatItems.map((item, i) => (
+                    <StatCard key={item.id} item={item} index={i} />
+                  ))
+                : <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: C.textSoft, fontSize: 13, fontFamily: font }}>No items tagged "{activeTag}" yet.</div>
               : platformStatItems.map((item, i) => (
                   <StatCard key={item.platform} item={item} index={i} onClick={() => navigate(`/platform/${item.platform.toLowerCase()}`)} />
                 ))

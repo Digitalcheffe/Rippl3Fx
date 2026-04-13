@@ -21,32 +21,44 @@ export function getMetricConfig(platform: string): MetricConfig[] {
   return rows;
 }
 
-/** Get previous cumulative value for a metric. */
-function getPrevious(accountId: number, metricName: string): number {
-  const row = db.prepare('SELECT previous_value FROM metric_previous WHERE metric_account_id = ? AND metric_name = ?').get(accountId, metricName) as { previous_value: number } | undefined;
+/**
+ * Get previous cumulative value for a metric.
+ * @param trackedItemId - null for account-level, number for per-item tracking
+ */
+function getPrevious(accountId: number, metricName: string, trackedItemId: number | null = null): number {
+  const itemId = trackedItemId ?? 0; // 0 = account-level
+  const row = db.prepare(
+    'SELECT previous_value FROM metric_previous WHERE metric_account_id = ? AND tracked_item_id = ? AND metric_name = ?'
+  ).get(accountId, itemId, metricName) as { previous_value: number } | undefined;
   return row?.previous_value ?? 0;
 }
 
-/** Store current cumulative value as previous for next delta calculation. */
-function setPrevious(accountId: number, metricName: string, value: number): void {
+/**
+ * Store current cumulative value as previous for next delta calculation.
+ * @param trackedItemId - null/0 for account-level, number for per-item tracking
+ */
+function setPrevious(accountId: number, metricName: string, value: number, trackedItemId: number | null = null): void {
+  const itemId = trackedItemId ?? 0; // 0 = account-level
   db.prepare(`
-    INSERT INTO metric_previous (metric_account_id, metric_name, previous_value)
-    VALUES (?, ?, ?)
-    ON CONFLICT(metric_account_id, metric_name) DO UPDATE SET
+    INSERT INTO metric_previous (metric_account_id, tracked_item_id, metric_name, previous_value)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(metric_account_id, tracked_item_id, metric_name) DO UPDATE SET
       previous_value = excluded.previous_value, updated_at = CURRENT_TIMESTAMP
-  `).run(accountId, metricName, value);
+  `).run(accountId, itemId, metricName, value);
 }
 
 /**
  * Calculate lane values from raw metrics using metric_config.
  * For 'delta' metrics: computes change from previous stored value and updates previous.
  * For 'incremental' metrics: uses raw value directly.
+ * @param trackedItemId - null for account-level, number for per-item tracking
  */
 export function calcLanesFromRaw(
   accountId: number,
   platform: string,
   rawMetrics: Record<string, number>,
   updatePrevious: boolean = true,
+  trackedItemId: number | null = null,
 ): LaneValues {
   const config = getMetricConfig(platform);
   const lanes: LaneValues = { reach: 0, interest: 0, engagement: 0 };
@@ -56,11 +68,11 @@ export function calcLanesFromRaw(
     let value: number;
 
     if (cfg.calc_type === 'delta') {
-      const prev = getPrevious(accountId, cfg.metric_name);
+      const prev = getPrevious(accountId, cfg.metric_name, trackedItemId);
       // Delta = current - previous. If no previous (first time), delta = 0 (baseline).
       value = prev > 0 ? Math.max(0, rawValue - prev) : 0;
       if (updatePrevious) {
-        setPrevious(accountId, cfg.metric_name, rawValue);
+        setPrevious(accountId, cfg.metric_name, rawValue, trackedItemId);
       }
     } else {
       // Incremental — use raw value directly
@@ -73,15 +85,13 @@ export function calcLanesFromRaw(
   return lanes;
 }
 
-/** Set baseline cumulative values for delta tracking (called after backfill). */
-export function setPreviousBaseline(accountId: number, metrics: Record<string, number>): void {
+/**
+ * Set baseline cumulative values for delta tracking (called after backfill).
+ * @param trackedItemId - null for account-level, number for per-item tracking
+ */
+export function setPreviousBaseline(accountId: number, metrics: Record<string, number>, trackedItemId: number | null = null): void {
   for (const [name, value] of Object.entries(metrics)) {
-    db.prepare(`
-      INSERT INTO metric_previous (metric_account_id, metric_name, previous_value)
-      VALUES (?, ?, ?)
-      ON CONFLICT(metric_account_id, metric_name) DO UPDATE SET
-        previous_value = excluded.previous_value, updated_at = CURRENT_TIMESTAMP
-    `).run(accountId, name, value);
+    setPrevious(accountId, name, value, trackedItemId);
   }
 }
 

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getTrackedItemsWithPlatform, getTagsForItem, getLatestSnapshot } from '../db/queries/metrics';
-import { getTrackedPair, getTrackedHistory } from '../db/queries/tracked';
-import { getUnifiedPair } from '../db/queries/unified';
+import { getTrackedPair, getTrackedHistory, getHourlyPair, getHourlyHistory } from '../db/queries/tracked';
+import { getUnifiedPair, getUnifiedHistory } from '../db/queries/unified';
 import { getPerformanceWeights } from './performance';
 import { getPeaks } from '../lanes/unify';
 
@@ -15,8 +15,10 @@ router.get('/dashboard', (req: Request, res: Response) => {
   const weights = getPerformanceWeights();
 
   const items = trackedItems.map(ti => {
-    // Get current + previous from tracked_metrics for this range
-    const { current, previous } = getTrackedPair(ti.id, range);
+    // Get current + previous — hourly reads from hourly_metrics, others from tracked_metrics
+    const { current, previous } = range === 'hourly'
+      ? getHourlyPair(ti.id)
+      : getTrackedPair(ti.id, range);
 
     // Lane values from tracked_metrics (same numbers shown in UI)
     const reach = current?.reach_value ?? 0;
@@ -33,7 +35,10 @@ router.get('/dashboard', (req: Request, res: Response) => {
     const performanceVelocity = performanceScore - (previous?.performance_score ?? 0);
 
     // History arrays for charts (last 7 periods)
-    const history = getTrackedHistory(ti.id, range, 7).reverse();
+    const history = (range === 'hourly'
+      ? getHourlyHistory(ti.id, 7)
+      : getTrackedHistory(ti.id, range, 7)
+    ).reverse();
     const reachHistory = history.map(r => r.reach_value ?? 0);
     const interestHistory = history.map(r => r.interest_value ?? 0);
     const engagementHistory = history.map(r => r.engagement_value ?? 0);
@@ -63,6 +68,9 @@ router.get('/dashboard', (req: Request, res: Response) => {
       // Velocity
       velocity,
       performanceVelocity: Math.round(performanceVelocity * 100) / 100,
+      // Period info (for date labels — especially weekly/monthly fallback)
+      periodStart: current?.period_start ?? null,
+      periodEnd: current?.period_end ?? null,
       // History for charts
       reachHistory,
       interestHistory,
@@ -123,15 +131,48 @@ router.get('/dashboard', (req: Request, res: Response) => {
             engagement: (current.engagement_value ?? 0) - (previous?.engagement_value ?? 0),
           },
           performanceVelocity: Math.round(((current.performance_score ?? 0) - (previous?.performance_score ?? 0)) * 100) / 100,
+          periodStart: current.period_start ?? null,
+          periodEnd: current.period_end ?? null,
         };
       }
     }
   }
 
-  // Add peak data to each platform
+  // Add peak data + history to each platform
   const effectiveRange = range === 'hourly' ? 'daily' : range;
   for (const p of Object.keys(platforms)) {
     platforms[p].peaks = getPeaks(null, p, effectiveRange);
+
+    // Platform-level history for charts
+    if (tagFilter) {
+      // Tag-filtered: sum history from filtered items for this platform
+      const platformItems = items.filter(i => i.platform === p);
+      const reachH = [0,0,0,0,0,0,0], interestH = [0,0,0,0,0,0,0], engagementH = [0,0,0,0,0,0,0], perfH = [0,0,0,0,0,0,0];
+      for (const item of platformItems) {
+        for (let i = 0; i < 7; i++) {
+          reachH[i] += item.reachHistory?.[i] ?? 0;
+          interestH[i] += item.interestHistory?.[i] ?? 0;
+          engagementH[i] += item.engagementHistory?.[i] ?? 0;
+          perfH[i] += item.performanceHistory?.[i] ?? 0;
+        }
+      }
+      platforms[p].reachHistory = reachH;
+      platforms[p].interestHistory = interestH;
+      platforms[p].engagementHistory = engagementH;
+      platforms[p].performanceHistory = perfH;
+    } else {
+      // Unfiltered: use unified_metrics history
+      const history = getUnifiedHistory(p, effectiveRange, 7).reverse();
+      platforms[p].reachHistory = history.map(r => r.reach_value ?? 0);
+      platforms[p].interestHistory = history.map(r => r.interest_value ?? 0);
+      platforms[p].engagementHistory = history.map(r => r.engagement_value ?? 0);
+      platforms[p].performanceHistory = history.map(r => r.performance_score ?? 0);
+      // Pad to 7
+      while (platforms[p].reachHistory.length < 7) platforms[p].reachHistory.unshift(0);
+      while (platforms[p].interestHistory.length < 7) platforms[p].interestHistory.unshift(0);
+      while (platforms[p].engagementHistory.length < 7) platforms[p].engagementHistory.unshift(0);
+      while (platforms[p].performanceHistory.length < 7) platforms[p].performanceHistory.unshift(0);
+    }
   }
 
   // Totals across all platforms (for lane cards)
@@ -165,6 +206,92 @@ router.get('/dashboard', (req: Request, res: Response) => {
   }
 
   res.json({ items, platforms, totals, distribution, weights });
+});
+
+// POST /api/dashboard/recalculate — rebuild all tracked_metrics, unified_metrics, peaks from daily platform tables
+router.post('/recalculate', (_req: Request, res: Response) => {
+  const db = require('../db/connection').default;
+  const { writeMetrics } = require('../lanes/unify');
+  const { setPreviousBaseline } = require('../lanes/calc');
+  const { runWeeklyRollup } = require('../rollup/weekly');
+  const { getWeekStart, getWeekEnd } = require('../utils/week');
+  const { getLocalDate } = require('../utils/timezone');
+
+  console.log('[Recalculate] Starting full metrics recalculation...');
+
+  // 1. Clear all computed metrics (keep raw daily platform tables intact)
+  db.prepare("DELETE FROM tracked_metrics").run();
+  db.prepare("DELETE FROM unified_metrics").run();
+  db.prepare("DELETE FROM peak_metrics").run();
+  db.prepare("DELETE FROM hourly_metrics").run();
+  db.prepare("DELETE FROM metric_previous WHERE tracked_item_id IS NOT NULL").run();
+
+  // 2. Get all tracked items with their accounts
+  const items = db.prepare(`
+    SELECT ti.id, ti.metric_account_id, ma.platform
+    FROM tracked_items ti
+    JOIN metric_accounts ma ON ti.metric_account_id = ma.id
+  `).all() as Array<{ id: number; metric_account_id: number; platform: string }>;
+
+  const DAILY_TABLES: Record<string, string> = {
+    github: 'github_daily', ga4: 'ga4_daily', bing: 'bing_daily',
+  };
+
+  let totalRows = 0;
+
+  // 3. For each item, walk through daily rows chronologically and recalculate
+  for (const item of items) {
+    const dailyTable = DAILY_TABLES[item.platform];
+    if (!dailyTable) continue;
+
+    const dailyRows = db.prepare(
+      `SELECT * FROM ${dailyTable} WHERE tracked_item_id = ? ORDER BY period_start ASC`
+    ).all(item.id) as Record<string, any>[];
+
+    for (const row of dailyRows) {
+      writeMetrics(item.id, item.platform, 'daily', row.period_start, row.period_start, row, item.metric_account_id);
+      totalRows++;
+    }
+  }
+
+  // 4. Rebuild weekly rollups from corrected dailies
+  const range = db.prepare(
+    "SELECT MIN(period_start) as min_date, MAX(period_start) as max_date FROM tracked_metrics WHERE period_type = 'daily'"
+  ).get() as { min_date: string | null; max_date: string | null };
+
+  let weekCount = 0;
+  if (range?.min_date && range?.max_date) {
+    // Clear platform weekly tables
+    for (const table of ['github_weekly', 'ga4_weekly', 'bing_weekly']) {
+      try { db.prepare(`DELETE FROM ${table}`).run(); } catch { /* may not exist */ }
+    }
+
+    let current = getWeekStart(range.min_date);
+    while (current <= range.max_date) {
+      runWeeklyRollup(current);
+      weekCount++;
+      const d = new Date(current + 'T12:00:00');
+      d.setDate(d.getDate() + 7);
+      current = getLocalDate(d);
+    }
+  }
+
+  // 5. Rebuild monthly rollups
+  const { runMonthlyRollup } = require('../rollup/monthly');
+  let monthCount = 0;
+  if (range?.min_date && range?.max_date) {
+    const startMonth = range.min_date.slice(0, 7);
+    const endMonth = range.max_date.slice(0, 7);
+    let [y, m] = startMonth.split('-').map(Number);
+    while (`${y}-${String(m).padStart(2, '0')}` <= endMonth) {
+      try { runMonthlyRollup(y, m); monthCount++; } catch { /* ignore */ }
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
+  }
+
+  console.log(`[Recalculate] Complete — ${totalRows} daily rows, ${weekCount} weeks, ${monthCount} months`);
+  res.json({ success: true, dailyRows: totalRows, weeks: weekCount, months: monthCount });
 });
 
 export default router;

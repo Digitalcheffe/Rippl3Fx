@@ -107,13 +107,17 @@ rippl3fx/
 │   │   │   └── scheduler.ts
 │   │   ├── rollup/
 │   │   │   ├── daily.ts            # 23:55 — runs BEFORE hourly purge
-│   │   │   ├── weekly.ts           # Sunday 23:58
+│   │   │   ├── weekly.ts           # User-configurable week start day
 │   │   │   ├── monthly.ts          # Last day 23:59
-│   │   │   └── hourly-purge.ts     # Purges hourly rows >48hrs AFTER daily rollup
+│   │   │   └── hourly-purge.ts     # Purges hourly_metrics rows >48hrs AFTER daily rollup
 │   │   ├── lanes/
 │   │   │   ├── mapper.ts           # Raw metrics → Reach/Interest/Engagement
+│   │   │   ├── calc.ts             # Config-driven lane calculation with delta tracking
 │   │   │   ├── velocity.ts         # Delta calculations per time horizon
 │   │   │   └── performance.ts      # Performance score using stored weights
+│   │   ├── utils/
+│   │   │   ├── timezone.ts         # Timezone-aware date helpers
+│   │   │   └── week.ts             # Shared getWeekStart/getWeekEnd (configurable start day)
 │   │   └── auth/
 │   │       ├── jwt.ts
 │   │       ├── bcrypt.ts
@@ -210,9 +214,28 @@ CREATE TABLE performance_weights (
 -- Single row only. Weights must sum to 1.0 — validated on write.
 ```
 
+### Hourly Metrics (Separate Table)
+
+```sql
+CREATE TABLE hourly_metrics (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  tracked_item_id   INTEGER NOT NULL REFERENCES tracked_items(id),
+  platform          TEXT NOT NULL CHECK(platform IN ('reddit','github','ga4','bing')),
+  period_start      TEXT NOT NULL,
+  reach_value       REAL NOT NULL DEFAULT 0,
+  interest_value    REAL NOT NULL DEFAULT 0,
+  engagement_value  REAL NOT NULL DEFAULT 0,
+  performance_score REAL NOT NULL DEFAULT 0,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(tracked_item_id, period_start)
+);
+```
+
+Hourly data is throwaway real-time data — stored separately from the permanent `tracked_metrics` pipeline and purged after 48 hours. The `tracked_metrics` table only contains daily/weekly/monthly period types.
+
 ### Platform Snapshot Tables
 
-Each platform has 5 tables: `{platform}_snapshots` (hourly, 48hr retention), `{platform}_daily`, `{platform}_weekly`, `{platform}_monthly`.
+Each platform has tables: `{platform}_snapshots` (raw per-poll data), `{platform}_daily`, `{platform}_weekly`, `{platform}_monthly`.
 
 All rollup tables include `reach_score`, `interest_score`, `engagement_score` columns — raw summed lane values, no weighting.
 
@@ -237,7 +260,7 @@ DB_PATH=          # Default: ./data/rippl3fx.db
 ## Auth Flow
 
 1. No user in DB → redirect to `/setup`
-2. Setup: username, password (bcrypt cost 12), optional TOTP
+2. Setup: username, password (bcrypt cost 12), optional TOTP, week_start_day defaults to 1 (Monday)
 3. Login: password → if TOTP enabled → TOTP code → JWT httpOnly cookie
 4. All `/api/*` routes protected except `/api/auth/*` and `/api/health`
 5. Settings: change password, enable/disable/regenerate TOTP
@@ -358,6 +381,9 @@ issue-23-dashboard-page
 - Weights are user-configurable and stored in `performance_weights` table — never hardcode them
 - Always show the weight formula beneath the performance score in the UI
 - Rollup must run before hourly purge — never reverse this order
+- Hourly metrics live in `hourly_metrics` table (separate from `tracked_metrics`) — throwaway data, purged after 48hrs
+- Week start day is user-configurable (Settings → Profile) — use `getWeekStart()` from `utils/week.ts`, never hardcode Monday
+- GitHub cumulative metrics (stars, watchers, forks) use delta tracking via `metric_previous` table — historical days show 0 (expected)
 - GitHub Traffic API retains 14 days — daily polling is mandatory, not optional
 - Reddit vote counts are approximate — always label as approx in UI
 - Bing avg_rank is inverted — flip sign for velocity calculations

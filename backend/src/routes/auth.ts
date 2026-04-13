@@ -4,6 +4,8 @@ import { hashPassword, comparePassword } from '../auth/bcrypt';
 import { signToken } from '../auth/jwt';
 import { generateSecret, generateQRCode, verifyCode } from '../auth/totp';
 import { AuthRequest, requireAuth } from '../middleware/auth';
+import { clearWeekStartCache } from '../utils/week';
+import { rerollWeeklyData } from '../rollup/weekly';
 
 const router = Router();
 
@@ -100,14 +102,34 @@ router.get('/me', requireAuth, (req: AuthRequest, res: Response) => {
     res.status(401).json({ error: 'Not authenticated' });
     return;
   }
-  const user = db.prepare('SELECT id, username, totp_enabled, created_at FROM user WHERE id = ?')
-    .get(req.user.userId) as { id: number; username: string; totp_enabled: number; created_at: string } | undefined;
+  const user = db.prepare('SELECT id, username, totp_enabled, week_start_day, created_at FROM user WHERE id = ?')
+    .get(req.user.userId) as { id: number; username: string; totp_enabled: number; week_start_day: number; created_at: string } | undefined;
 
   if (!user) {
     res.status(404).json({ error: 'User not found' });
     return;
   }
   res.json(user);
+});
+
+// PUT /api/auth/week-start — update week start day preference (protected)
+router.put('/week-start', requireAuth, (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+  const { weekStartDay } = req.body;
+  if (typeof weekStartDay !== 'number' || weekStartDay < 0 || weekStartDay > 6) {
+    res.status(400).json({ error: 'weekStartDay must be 0 (Sun) through 6 (Sat)' });
+    return;
+  }
+  db.prepare('UPDATE user SET week_start_day = ? WHERE id = ?').run(weekStartDay, req.user.userId);
+  clearWeekStartCache();
+  res.json({ success: true, weekStartDay });
+  // Re-rollup weekly data async — don't block the response
+  try { rerollWeeklyData(weekStartDay); } catch (err: any) {
+    console.error(`[Auth] Weekly re-rollup failed: ${err.message}`);
+  }
 });
 
 // POST /api/auth/totp/setup — generate TOTP secret + QR (protected)

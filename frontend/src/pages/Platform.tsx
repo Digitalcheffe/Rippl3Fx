@@ -18,6 +18,20 @@ const PLATFORM_NAMES: Record<string, string> = {
   github: 'GitHub', ga4: 'GA4', bing: 'Bing',
 };
 
+/** Format a period date range for display (e.g., "Apr 7–13"). */
+function formatPeriodLabel(range: string, periodStart?: string | null, periodEnd?: string | null): string {
+  if ((range === 'weekly' || range === 'monthly') && periodStart && periodEnd) {
+    const s = new Date(periodStart + 'T12:00:00');
+    const e = new Date(periodEnd + 'T12:00:00');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    if (s.getMonth() === e.getMonth()) {
+      return `${months[s.getMonth()]} ${s.getDate()}–${e.getDate()}`;
+    }
+    return `${months[s.getMonth()]} ${s.getDate()} – ${months[e.getMonth()]} ${e.getDate()}`;
+  }
+  return { hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[range] || range;
+}
+
 interface Account {
   id: number;
   platform: string;
@@ -72,6 +86,8 @@ export default function Platform() {
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [activeChart, setActiveChart] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [activeTag, setActiveTag] = useState('All');
+  const [showDiscovery, setShowDiscovery] = useState(false);
 
   // Load accounts for this platform
   useEffect(() => {
@@ -104,9 +120,12 @@ export default function Platform() {
     });
   }, [items]);
 
-  // Load dashboard data for platform-level metrics
+  // Load dashboard data — always fetch platform-level, plus tag-filtered when tag selected
   const [platformData, setPlatformData] = useState<any>(null);
+  const [tagData, setTagData] = useState<any>(null);
+  const [tagDashboardItems, setTagDashboardItems] = useState<any[]>([]);
   useEffect(() => {
+    // Always fetch unfiltered platform data
     const params = new URLSearchParams();
     params.set('range', timeRange);
     apiGet<{ items: any[]; platforms: Record<string, any> }>(`/dashboard?${params}`)
@@ -115,7 +134,23 @@ export default function Platform() {
         setPlatformData(data.platforms?.[platform || ''] || null);
       })
       .catch(() => {});
-  }, [platform, items, timeRange]);
+
+    // Fetch tag-filtered data when a tag is selected
+    if (activeTag !== 'All') {
+      const tagParams = new URLSearchParams();
+      tagParams.set('range', timeRange);
+      tagParams.set('tag', activeTag);
+      apiGet<{ items: any[]; platforms: Record<string, any> }>(`/dashboard?${tagParams}`)
+        .then(data => {
+          setTagDashboardItems(data.items.filter(i => i.platform === platform));
+          setTagData(data.platforms?.[platform || ''] || null);
+        })
+        .catch(() => {});
+    } else {
+      setTagData(null);
+      setTagDashboardItems([]);
+    }
+  }, [platform, items, timeRange, activeTag]);
 
   // Load all tags for add-item tag select
   useEffect(() => {
@@ -128,6 +163,15 @@ export default function Platform() {
       Reach: { current: platformData.reach ?? 0, velocity: platformData.velocity?.reach ?? 0 },
       Interest: { current: platformData.interest ?? 0, velocity: platformData.velocity?.interest ?? 0 },
       Engagement: { current: platformData.engagement ?? 0, velocity: platformData.velocity?.engagement ?? 0 },
+    },
+  }] : [];
+
+  // Lane summary from tag-filtered data (when a tag is selected)
+  const tagLaneSummaryItems = tagData ? [{
+    lanes: {
+      Reach: { current: tagData.reach ?? 0, velocity: tagData.velocity?.reach ?? 0 },
+      Interest: { current: tagData.interest ?? 0, velocity: tagData.velocity?.interest ?? 0 },
+      Engagement: { current: tagData.engagement ?? 0, velocity: tagData.velocity?.engagement ?? 0 },
     },
   }] : [];
 
@@ -174,22 +218,51 @@ export default function Platform() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+      {/* Row 1: Platform name + time toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 0 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>{name}</h1>
         </div>
+        <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 8, padding: 2 }}>
+          {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
+            <button key={range} onClick={() => setTimeRange(range)} style={{
+              padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
+              border: 'none', color: timeRange === range ? '#fff' : C.textMid,
+              fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
+              borderRadius: 6, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
+            }}>{range}</button>
+          ))}
+        </div>
+      </div>
+
+      <hr style={{ border: 'none', borderTop: `3px solid ${C.borderMid}`, margin: '10px 0' }} />
+
+      {/* Row 2: Tag selector + Poll Now + Info */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 8, padding: 2 }}>
-            {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
-              <button key={range} onClick={() => setTimeRange(range)} style={{
-                padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
-                border: 'none', color: timeRange === range ? '#fff' : C.textMid,
-                fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
-                borderRadius: 6, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
-              }}>{range}</button>
-            ))}
-          </div>
+          {allTags.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 10, color: C.textSoft, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.8 }}>Tag</span>
+              <select value={activeTag} onChange={e => setActiveTag(e.target.value)} style={{
+                padding: '5px 12px', background: C.bgInput, border: `1px solid ${C.border}`,
+                borderRadius: 7, color: C.text, fontSize: 12, fontFamily: font, cursor: 'pointer', outline: 'none',
+              }}>
+                <option value="All">All</option>
+                {allTags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {activeAccountId && (
+            <button onClick={() => setShowDiscovery(true)} style={{
+              padding: '5px 12px', background: platformColor + '15',
+              border: `1px solid ${platformColor}40`, borderRadius: 6,
+              color: platformColor, fontSize: 10, fontWeight: 700,
+              cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
+            }}>Browse</button>
+          )}
           <button onClick={handlePollNow} disabled={polling} style={{
             padding: '5px 12px', background: C.up + '15',
             border: `1px solid ${C.up}55`, borderRadius: 6,
@@ -202,6 +275,26 @@ export default function Platform() {
           <LaneInfoButton onClick={() => setShowInfo(!showInfo)} />
         </div>
       </div>
+
+      {/* Discovery modal */}
+      {showDiscovery && activeAccountId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(13,31,53,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: C.bgCard, border: `1px solid ${C.borderMid}`, borderRadius: 14, width: 560, maxHeight: '80vh', overflow: 'auto', padding: 22, boxShadow: '0 24px 64px rgba(13,31,53,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: C.text, fontFamily: font }}>Discoverable Content</span>
+              <button onClick={() => setShowDiscovery(false)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 18, cursor: 'pointer' }}>x</button>
+            </div>
+            <DiscoveryPanel
+              accountId={activeAccountId}
+              platform={name}
+              autoExpand
+              onItemTracked={() => {
+                if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {showInfo && <LaneInfoPanel platform={name} onClose={() => setShowInfo(false)} />}
 
@@ -226,39 +319,51 @@ export default function Platform() {
             </div>
           )}
 
-          {/* Platform-level lanes + performance */}
-          {laneSummaryItems.length > 0 && (
-            <>
-              <LaneSummary
-                items={laneSummaryItems}
-                performanceScore={platformData?.performanceScore}
-                performanceVelocity={platformData?.performanceVelocity}
-                activeCard={activeChart}
-                onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
-                timeLabel={{ hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[timeRange]}
-                platform={platform}
-                peaks={platformData?.peaks}
-              />
-              <div style={{
-                maxHeight: activeChart ? 400 : 0,
-                opacity: activeChart ? 1 : 0,
-                overflow: 'hidden',
-                transition: 'max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease',
-                marginBottom: activeChart ? 20 : 0,
-              }}>
-                {activeChart === 'Performance' ? (
-                  <PerformanceTrend items={dashboardItems} platform={name} onClose={() => setActiveChart(null)} range={timeRange} />
-                ) : activeChart ? (
-                  <LayeredInterestChart
-                    items={dashboardItems}
-                    lane={activeChart}
-                    onClose={() => setActiveChart(null)}
-                    range={timeRange}
-                  />
-                ) : null}
-              </div>
-            </>
-          )}
+          {/* Lanes + all three charts always visible */}
+          {(() => {
+            const isTagged = activeTag !== 'All';
+            const activeLanes = isTagged ? tagLaneSummaryItems : laneSummaryItems;
+            const activeData = isTagged ? tagData : platformData;
+            const activeItems = isTagged ? tagDashboardItems : dashboardItems;
+            const label = isTagged
+              ? `#${activeTag} on ${name}`
+              : undefined;
+
+            if (activeLanes.length === 0) return null;
+
+            const chartItems = activeItems.length > 0 ? activeItems : (activeData ? [{
+              platform: platform,
+              reachHistory: activeData.reachHistory || [0,0,0,0,0,0,0],
+              interestHistory: activeData.interestHistory || [0,0,0,0,0,0,0],
+              engagementHistory: activeData.engagementHistory || [0,0,0,0,0,0,0],
+              performanceHistory: activeData.performanceHistory || [0,0,0,0,0,0,0],
+            }] : []);
+
+            return (
+              <>
+                {label && (
+                  <div style={{ fontSize: 10, letterSpacing: 2, color: C.accent, textTransform: 'uppercase', fontFamily: font, marginBottom: 8 }}>
+                    {label}
+                  </div>
+                )}
+                <LaneSummary
+                  items={activeLanes}
+                  performanceScore={activeData?.performanceScore}
+                  performanceVelocity={activeData?.performanceVelocity}
+                  activeCard={activeChart}
+                  onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
+                  timeLabel={formatPeriodLabel(timeRange, activeData?.periodStart, activeData?.periodEnd)}
+                  platform={platform}
+                  peaks={activeData?.peaks}
+                />
+                {chartItems.length > 0 && (
+                  <div style={{ marginTop: 12, marginBottom: 16 }}>
+                    <LayeredInterestChart items={chartItems} lane={activeChart || 'all'} range={timeRange} />
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* Two-column layout: content left, account overview right */}
           <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 16 }}>
@@ -300,7 +405,10 @@ export default function Platform() {
 
           {/* Tracked items */}
           {(() => {
-            const trackedItems = items.filter(i => i.is_active);
+            const allTracked = items.filter(i => i.is_active);
+            const trackedItems = activeTag !== 'All'
+              ? allTracked.filter(i => (itemTags[i.id] || []).some(t => t.name === activeTag))
+              : allTracked;
             const untrackedItems = items.filter(i => !i.is_active);
 
             const renderItem = (item: TrackedItem, i: number, isTracked: boolean) => {
@@ -401,16 +509,7 @@ export default function Platform() {
             );
           })()}
 
-              {/* Discovery Panel */}
-              {activeAccountId && (
-                <DiscoveryPanel
-                  accountId={activeAccountId}
-                  platform={name}
-                  onItemTracked={() => {
-                    if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
-                  }}
-                />
-              )}
+              {/* Discovery Panel (modal, triggered from header) */}
             </div>
 
             {/* Right column: Account Overview */}

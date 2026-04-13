@@ -23,7 +23,7 @@ export default function EmptyState({ platform }: { platform: string }) {
         Connect your account to start tracking. Browse your content and tag items to begin long-term polling.
       </div>
       <button
-        onClick={() => navigate('/settings')}
+        onClick={() => navigate('/settings?tab=accounts')}
         style={{ marginTop: 6, padding: '9px 22px', borderRadius: 8, background: color, color: '#fff', border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: font }}
       >
         Connect {platform}

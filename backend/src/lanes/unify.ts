@@ -1,5 +1,6 @@
 import db from '../db/connection';
 import { getPerformanceWeights } from '../routes/performance';
+import { calcLanesFromRaw } from './calc';
 
 /**
  * Lane mapping: platform-specific raw metrics → Reach / Interest / Engagement
@@ -148,9 +149,29 @@ export function getPeaks(trackedItemId: number | null, platform: string, periodT
   return row ?? null;
 }
 
+/** Write a row to hourly_metrics (separate throwaway table, purged after 48hrs). */
+export function writeHourlyMetric(
+  trackedItemId: number,
+  platform: string,
+  periodStart: string,
+  lanes: LaneValues,
+): void {
+  const perf = calcPerformanceScore(lanes);
+  db.prepare(`
+    INSERT INTO hourly_metrics (tracked_item_id, platform, period_start, reach_value, interest_value, engagement_value, performance_score)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(tracked_item_id, period_start) DO UPDATE SET
+      reach_value = excluded.reach_value,
+      interest_value = excluded.interest_value,
+      engagement_value = excluded.engagement_value,
+      performance_score = excluded.performance_score
+  `).run(trackedItemId, platform, periodStart, lanes.reach, lanes.interest, lanes.engagement, perf);
+}
+
 /**
- * Full write: map raw platform data → write tracked_metrics → refresh unified_metrics → update peaks.
- * Call this after any snapshot or rollup insert.
+ * Full write: raw platform data → config-driven lane calc → write metrics → refresh unified → update peaks.
+ * Uses metric_config (delta/incremental) and metric_previous for per-item delta tracking.
+ * Hourly writes go to hourly_metrics (separate table); daily/weekly/monthly go to tracked_metrics.
  */
 export function writeMetrics(
   trackedItemId: number,
@@ -159,11 +180,18 @@ export function writeMetrics(
   periodStart: string,
   periodEnd: string,
   rawRow: Record<string, any>,
+  accountId?: number,
 ): void {
-  const lanes = mapToLanes(platform, rawRow);
-  writeTrackedMetric(trackedItemId, platform, periodType, periodStart, periodEnd, lanes);
-  // Skip unified refresh for hourly — cumulative snapshots don't sum meaningfully
-  if (periodType !== 'hourly') {
+  // Use config-driven lane calculation when accountId is provided (respects delta/incremental)
+  // Falls back to mapToLanes for backward compatibility
+  const lanes = accountId
+    ? calcLanesFromRaw(accountId, platform, rawRow, true, trackedItemId)
+    : mapToLanes(platform, rawRow);
+
+  if (periodType === 'hourly') {
+    writeHourlyMetric(trackedItemId, platform, periodStart, lanes);
+  } else {
+    writeTrackedMetric(trackedItemId, platform, periodType, periodStart, periodEnd, lanes);
     refreshUnifiedMetric(platform, periodType, periodStart, periodEnd);
   }
 }
