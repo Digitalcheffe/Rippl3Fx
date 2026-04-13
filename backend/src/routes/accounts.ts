@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
+import db from '../db/connection';
 import { getAllAccounts, getAccountById, createAccount, updateAccount, deleteAccount, getActiveTrackedItems, updatePollSuccess, updatePollFailure } from '../db/queries/accounts';
 import { encryptCredentials, decryptCredentials } from '../crypto/credentials';
+import { purgeTrackedMetricsByAccount } from '../db/queries/tracked';
 import { collectGithub } from '../platforms/github';
 import { collectReddit } from '../platforms/reddit';
 import { collectGA4 } from '../platforms/ga4';
@@ -99,15 +101,46 @@ router.put('/:id', (req: Request, res: Response) => {
   res.json(account);
 });
 
-// DELETE /api/accounts/:id
+// POST /api/accounts/:id/deactivate — soft-delete: stop polling, untrack all items
+router.post('/:id/deactivate', (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const account = getAccountById(id);
+  if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
+
+  // Deactivate account
+  updateAccount(id, { is_active: 0 });
+  // Untrack all items under this account (clear tags, set inactive)
+  const items = db.prepare('SELECT id FROM tracked_items WHERE metric_account_id = ?').all(id) as Array<{ id: number }>;
+  for (const item of items) {
+    db.prepare('UPDATE tracked_items SET is_active = 0 WHERE id = ?').run(item.id);
+    db.prepare('DELETE FROM item_tags WHERE tracked_item_id = ?').run(item.id);
+  }
+
+  res.json({ success: true, message: `Account deactivated. ${items.length} items untracked. Metrics preserved.` });
+});
+
+// POST /api/accounts/:id/reactivate — re-enable account
+router.post('/:id/reactivate', (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const account = getAccountById(id);
+  if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
+
+  updateAccount(id, { is_active: 1 });
+  res.json({ success: true, message: 'Account reactivated. Re-track items individually.' });
+});
+
+// DELETE /api/accounts/:id — permanent delete: purges account + items + metrics
 router.delete('/:id', (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const deleted = deleteAccount(id);
-  if (!deleted) {
-    res.status(404).json({ error: 'Account not found' });
-    return;
-  }
-  res.json({ success: true });
+  const account = getAccountById(id);
+  if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
+
+  // Purge all tracked_metrics for items under this account
+  const purged = purgeTrackedMetricsByAccount(id);
+  // Delete account (cascades to tracked_items and item_tags)
+  deleteAccount(id);
+
+  res.json({ success: true, message: `Account permanently deleted. ${purged} metric rows purged.` });
 });
 
 // POST /api/accounts/:id/poll-now — trigger immediate poll
