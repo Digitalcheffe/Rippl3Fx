@@ -238,12 +238,13 @@ export default function Platform() {
                 marginBottom: activeChart ? 20 : 0,
               }}>
                 {activeChart === 'Performance' ? (
-                  <PerformanceTrend items={dashboardItems} platform={name} onClose={() => setActiveChart(null)} />
+                  <PerformanceTrend items={dashboardItems} platform={name} onClose={() => setActiveChart(null)} range={timeRange} />
                 ) : activeChart ? (
                   <LayeredInterestChart
                     items={dashboardItems}
                     lane={activeChart}
                     onClose={() => setActiveChart(null)}
+                    range={timeRange}
                   />
                 ) : null}
               </div>

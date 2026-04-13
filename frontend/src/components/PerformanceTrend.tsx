@@ -3,28 +3,39 @@ import { C } from '../theme';
 
 const font = "'DM Mono', monospace";
 
-function getDateLabels(days: number = 7): string[] {
+function getLabels(range: string = 'daily', count: number = 7): string[] {
   const labels: string[] = [];
   const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
+  for (let i = count - 1; i >= 0; i--) {
     const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    if (i === 0) { labels.push('Today'); }
-    else { labels.push(`${d.getMonth() + 1}/${d.getDate()}`); }
+    if (range === 'weekly') {
+      d.setDate(d.getDate() - i * 7);
+      const mon = new Date(d);
+      const day = mon.getDay();
+      mon.setDate(mon.getDate() - (day === 0 ? 6 : day - 1));
+      labels.push(i === 0 ? 'This Week' : `${mon.getMonth() + 1}/${mon.getDate()}`);
+    } else if (range === 'monthly') {
+      d.setMonth(d.getMonth() - i);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      labels.push(i === 0 ? 'This Month' : months[d.getMonth()]);
+    } else {
+      d.setDate(d.getDate() - i);
+      labels.push(i === 0 ? 'Today' : `${d.getMonth() + 1}/${d.getDate()}`);
+    }
   }
   return labels;
 }
-const DAY_LABELS = getDateLabels(7);
 
 interface PerformanceTrendItem {
   interestHistory: number[];
 }
 
-export default function PerformanceTrend({ items, platform, width = 500, height = 100, onClose }: { items: PerformanceTrendItem[]; platform?: string; width?: number; height?: number; onClose?: () => void }) {
+export default function PerformanceTrend({ items, platform, width = 500, height = 100, onClose, range = 'daily' }: { items: PerformanceTrendItem[]; platform?: string; width?: number; height?: number; onClose?: () => void; range?: string }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const labels = getLabels(range);
 
   // Average performance across all items per day
-  const avgPerf = DAY_LABELS.map((_, di) => {
+  const avgPerf = labels.map((_, di) => {
     const vals = items.map(i => i.interestHistory?.[di] ?? 0);
     return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
   });
@@ -32,11 +43,11 @@ export default function PerformanceTrend({ items, platform, width = 500, height 
   // Fixed 0-100% scale
   const padL = 36, padR = 12, padT = 8, padB = 20;
   const cW = width - padL - padR, cH = height - padT - padB;
-  const toX = (i: number) => padL + (i / (DAY_LABELS.length - 1)) * cW;
+  const toX = (i: number) => padL + (i / (labels.length - 1)) * cW;
   const toY = (v: number) => padT + cH - (v / 100) * cH;
   const pts = avgPerf.map((v, i) => [toX(i), toY(v)]);
   const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-  const area = `${line} L${toX(DAY_LABELS.length - 1)},${padT + cH} L${toX(0)},${padT + cH} Z`;
+  const area = `${line} L${toX(labels.length - 1)},${padT + cH} L${toX(0)},${padT + cH} Z`;
 
   const current = avgPerf[avgPerf.length - 1];
   const prev = avgPerf[avgPerf.length - 2];
@@ -44,7 +55,7 @@ export default function PerformanceTrend({ items, platform, width = 500, height 
   const tColor = current > prev ? C.up : current < prev ? C.down : C.flat;
 
   // Tooltip positioning
-  const slotW = cW / DAY_LABELS.length;
+  const slotW = cW / labels.length;
 
   return (
     <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20, boxShadow: '0 2px 8px rgba(30,58,95,0.07)' }}>
@@ -97,7 +108,7 @@ export default function PerformanceTrend({ items, platform, width = 500, height 
         )}
 
         {/* Invisible hover zones */}
-        {DAY_LABELS.map((_, i) => (
+        {labels.map((_, i) => (
           <rect key={i} x={toX(i) - slotW / 2} y={0} width={slotW} height={height} fill="transparent"
             onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} style={{ cursor: 'crosshair' }} />
         ))}
@@ -107,7 +118,7 @@ export default function PerformanceTrend({ items, platform, width = 500, height 
           const val = avgPerf[hoverIdx];
           const x = pts[hoverIdx][0];
           const y = pts[hoverIdx][1];
-          const label = `${DAY_LABELS[hoverIdx]}: ${val.toFixed(1)}%`;
+          const label = `${labels[hoverIdx]}: ${val.toFixed(1)}%`;
           const tipW = label.length * 6.5 + 12;
           const tipX = x + tipW + 8 > width ? x - tipW - 4 : x + 4;
           const tipY = Math.max(padT, y - 22);
@@ -119,7 +130,7 @@ export default function PerformanceTrend({ items, platform, width = 500, height 
           );
         })()}
 
-        {DAY_LABELS.map((l, i) => (
+        {labels.map((l, i) => (
           <text key={l} x={toX(i)} y={height - 2} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
         ))}
       </svg>

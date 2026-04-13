@@ -3,18 +3,28 @@ import { C } from '../theme';
 
 const font = "'DM Mono', monospace";
 
-function getDateLabels(days: number = 7): string[] {
+function getLabels(range: string = 'daily', count: number = 7): string[] {
   const labels: string[] = [];
   const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
+  for (let i = count - 1; i >= 0; i--) {
     const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    if (i === 0) { labels.push('Today'); }
-    else { labels.push(`${d.getMonth() + 1}/${d.getDate()}`); }
+    if (range === 'weekly') {
+      d.setDate(d.getDate() - i * 7);
+      const mon = new Date(d);
+      const day = mon.getDay();
+      mon.setDate(mon.getDate() - (day === 0 ? 6 : day - 1));
+      labels.push(i === 0 ? 'This Week' : `${mon.getMonth() + 1}/${mon.getDate()}`);
+    } else if (range === 'monthly') {
+      d.setMonth(d.getMonth() - i);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      labels.push(i === 0 ? 'This Month' : months[d.getMonth()]);
+    } else {
+      d.setDate(d.getDate() - i);
+      labels.push(i === 0 ? 'Today' : `${d.getMonth() + 1}/${d.getDate()}`);
+    }
   }
   return labels;
 }
-const DAY_LABELS = getDateLabels(7);
 
 const PLATFORM_ORDER = ['github', 'ga4', 'bing'];
 const PLATFORM_DISPLAY: Record<string, string> = { github: 'GitHub', ga4: 'GA4', bing: 'Bing' };
@@ -32,8 +42,9 @@ export interface LaneChartItem {
   engagementHistory?: number[];
 }
 
-function LayeredChartSVG({ items, width, height, lane }: { items: LaneChartItem[]; width: number; height: number; lane: string }) {
+function LayeredChartSVG({ items, width, height, lane, range = 'daily' }: { items: LaneChartItem[]; width: number; height: number; lane: string; range?: string }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const labels = getLabels(range);
   const padL = 36, padR = 12, padT = 12, padB = 24;
   const cW = width - padL - padR;
   const cH = height - padT - padB;
@@ -59,7 +70,7 @@ function LayeredChartSVG({ items, width, height, lane }: { items: LaneChartItem[
   const toY = (v: number) => padT + cH - (v / maxVal) * cH;
 
   const laneColor = (C[lane as keyof typeof C] || C.accent) as string;
-  const slotW = cW / DAY_LABELS.length;
+  const slotW = cW / labels.length;
 
   return (
     <svg width={width} height={height} style={{ display: 'block' }}>
@@ -78,7 +89,7 @@ function LayeredChartSVG({ items, width, height, lane }: { items: LaneChartItem[
       <text x={8} y={padT + cH / 2} fontSize="9" fill={laneColor} textAnchor="middle" fontFamily="monospace" transform={`rotate(-90, 8, ${padT + cH / 2})`}>{lane}</text>
 
       {/* X axis labels */}
-      {DAY_LABELS.map((l, i) => (
+      {labels.map((l, i) => (
         <text key={l} x={toX(i)} y={height - 4} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
       ))}
 
@@ -109,7 +120,7 @@ function LayeredChartSVG({ items, width, height, lane }: { items: LaneChartItem[
       )}
 
       {/* Invisible hover zones */}
-      {DAY_LABELS.map((_, i) => (
+      {labels.map((_, i) => (
         <rect key={i} x={toX(i) - slotW / 2} y={0} width={slotW} height={height} fill="transparent"
           onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} style={{ cursor: 'crosshair' }} />
       ))}
@@ -129,7 +140,7 @@ function LayeredChartSVG({ items, width, height, lane }: { items: LaneChartItem[
         return (
           <g>
             <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={6} fill={C.bgCard} stroke={C.border} strokeWidth={0.5} opacity={0.95} />
-            <text x={tipX + 8} y={tipY + 12} fontSize="9" fontWeight="700" fill={C.text} fontFamily={font}>{DAY_LABELS[hoverIdx]}</text>
+            <text x={tipX + 8} y={tipY + 12} fontSize="9" fontWeight="700" fill={C.text} fontFamily={font}>{labels[hoverIdx]}</text>
             {lines.map((l, li) => (
               <g key={l.name}>
                 <circle cx={tipX + 10} cy={tipY + 24 + li * 14} r={3} fill={l.color} />
@@ -144,7 +155,7 @@ function LayeredChartSVG({ items, width, height, lane }: { items: LaneChartItem[
   );
 }
 
-export default function LayeredInterestChart({ items, lane = 'Interest', tag, onClose }: { items: LaneChartItem[]; lane?: string; tag?: string; onClose?: () => void }) {
+export default function LayeredInterestChart({ items, lane = 'Interest', tag, onClose, range = 'daily' }: { items: LaneChartItem[]; lane?: string; tag?: string; onClose?: () => void; range?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(500);
 
@@ -188,7 +199,7 @@ export default function LayeredInterestChart({ items, lane = 'Interest', tag, on
         </div>
       </div>
 
-      <LayeredChartSVG items={items} width={width - 40} height={120} lane={lane} />
+      <LayeredChartSVG items={items} width={width - 40} height={120} lane={lane} range={range} />
     </div>
   );
 }

@@ -209,13 +209,14 @@ export default function Dashboard() {
             marginBottom: activeChart ? 20 : 0,
           }}>
             {activeChart === 'Performance' ? (
-              <PerformanceTrend items={items} onClose={() => setActiveChart(null)} />
+              <PerformanceTrend items={items} onClose={() => setActiveChart(null)} range={timeRange} />
             ) : activeChart ? (
               <LayeredInterestChart
                 items={items}
                 lane={activeChart}
                 tag={activeTag !== 'All' ? activeTag : undefined}
                 onClose={() => setActiveChart(null)}
+                range={timeRange}
               />
             ) : null}
           </div>
