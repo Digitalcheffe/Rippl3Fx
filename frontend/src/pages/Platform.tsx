@@ -222,6 +222,7 @@ export default function Platform() {
                 performanceVelocity={platformData?.performanceVelocity}
                 activeCard={activeChart}
                 onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
+                timeLabel={{ hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[timeRange]}
               />
               <div style={{
                 maxHeight: activeChart ? 400 : 0,

@@ -193,6 +193,7 @@ export default function Dashboard() {
             weights={weights}
             activeCard={activeChart}
             onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
+            timeLabel={{ hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[timeRange]}
           />
 
           {/* Collapsible chart panel */}
