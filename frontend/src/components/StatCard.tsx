@@ -36,15 +36,17 @@ export interface StatCardItem {
   tags: string[];
   lanes: Record<string, LaneData>;
   performanceScore?: number;
+  distribution?: { reach: number; interest: number; engagement: number };
 }
 
 interface LaneRowProps {
   lane: string;
   data: LaneData;
   compact?: boolean;
+  distPct?: number;
 }
 
-function LaneRow({ lane, data, compact = false }: LaneRowProps) {
+function LaneRow({ lane, data, compact = false, distPct }: LaneRowProps) {
   const color = C[lane as keyof typeof C] as string;
   const vc = velColor(data.velocity);
   return (
@@ -57,6 +59,11 @@ function LaneRow({ lane, data, compact = false }: LaneRowProps) {
       {data.velocity !== 0 && (
         <div style={{ fontSize: 10, color: vc, fontWeight: 700, fontFamily: font, minWidth: 36, textAlign: 'right' }}>
           {velArrow(data.velocity)} {velSign(data.velocity)}{fmt(Math.abs(data.velocity))}
+        </div>
+      )}
+      {distPct != null && (
+        <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font, minWidth: 36, textAlign: 'right' }}>
+          {distPct.toFixed(1)}%
         </div>
       )}
     </div>
@@ -115,7 +122,9 @@ export default function StatCard({ item, index = 0, onClick }: { item: StatCardI
         {LANES.map(lane => {
           const data = item.lanes[lane];
           if (!data) return null;
-          return <LaneRow key={lane} lane={lane} data={data} />;
+          const dist = item.distribution;
+          const pct = dist ? dist[lane.toLowerCase() as keyof typeof dist] : undefined;
+          return <LaneRow key={lane} lane={lane} data={data} distPct={pct} />;
         })}
       </div>
 
