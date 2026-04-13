@@ -38,18 +38,14 @@ interface Tag {
   name: string;
 }
 
-function mapItemToLanes(item: any, plat: string): Record<string, { current: number; history: number[]; velocity: number }> {
-  const snap = item.latestSnapshot;
-  const hist = item.interestHistory || [0,0,0,0,0,0,0];
+/** Map a dashboard API item (with reach/interest/engagement directly) to StatCard lanes. */
+function itemToLanes(item: any): Record<string, { current: number; history: number[]; velocity: number }> {
   const v = item.velocity || { reach: 0, interest: 0, engagement: 0 };
-  if (!snap) return { Reach: { current: 0, history: hist, velocity: 0 }, Interest: { current: 0, history: hist, velocity: 0 }, Engagement: { current: 0, history: hist, velocity: 0 } };
-  switch (plat) {
-    case 'github': return { Reach: { current: (snap.traffic_views||0)+(snap.traffic_uniques||0), history: hist, velocity: v.reach }, Interest: { current: (snap.stars||0)+(snap.forks||0), history: hist, velocity: v.interest }, Engagement: { current: (snap.clones||0)+(snap.clones_uniques||0), history: hist, velocity: v.engagement } };
-    case 'reddit': return { Reach: { current: snap.view_count||0, history: hist, velocity: v.reach }, Interest: { current: snap.upvotes||0, history: hist, velocity: v.interest }, Engagement: { current: snap.comment_count||0, history: hist, velocity: v.engagement } };
-    case 'ga4': return { Reach: { current: snap.pageviews||0, history: hist, velocity: v.reach }, Interest: { current: snap.users||0, history: hist, velocity: v.interest }, Engagement: { current: snap.sessions||0, history: hist, velocity: v.engagement } };
-    case 'bing': return { Reach: { current: snap.impressions||0, history: hist, velocity: v.reach }, Interest: { current: snap.clicks||0, history: hist, velocity: v.interest }, Engagement: { current: snap.ctr?Math.round(snap.ctr*1000)/10:0, history: hist, velocity: v.engagement } };
-    default: return { Reach: { current: 0, history: hist, velocity: 0 }, Interest: { current: 0, history: hist, velocity: 0 }, Engagement: { current: 0, history: hist, velocity: 0 } };
-  }
+  return {
+    Reach: { current: item.reach ?? 0, history: item.reachHistory || [0,0,0,0,0,0,0], velocity: v.reach },
+    Interest: { current: item.interest ?? 0, history: item.interestHistory || [0,0,0,0,0,0,0], velocity: v.interest },
+    Engagement: { current: item.engagement ?? 0, history: item.engagementHistory || [0,0,0,0,0,0,0], velocity: v.engagement },
+  };
 }
 
 const inp: React.CSSProperties = {
@@ -113,30 +109,26 @@ export default function Platform() {
   }, []);
 
   // Load dashboard data for platform-level metrics
+  const [platformData, setPlatformData] = useState<any>(null);
   useEffect(() => {
     const params = new URLSearchParams();
     params.set('range', timeRange);
-    apiGet<{ items: any[] }>(`/dashboard?${params}`)
+    apiGet<{ items: any[]; platforms: Record<string, any> }>(`/dashboard?${params}`)
       .then(data => {
-        const filtered = data.items.filter(i => i.platform === platform);
-        setDashboardItems(filtered);
+        setDashboardItems(data.items.filter(i => i.platform === platform));
+        setPlatformData(data.platforms?.[platform || ''] || null);
       })
       .catch(() => {});
   }, [platform, items, timeRange]);
 
-  // Map dashboard items to lane data for LaneSummary
-  const laneSummaryItems = dashboardItems.map(item => {
-    const snap = item.latestSnapshot;
-    const v = item.velocity || { reach: 0, interest: 0, engagement: 0 };
-    if (!snap) return { lanes: { Reach: { current: 0, velocity: 0 }, Interest: { current: 0, velocity: 0 }, Engagement: { current: 0, velocity: 0 } } };
-    switch (platform) {
-      case 'github': return { lanes: { Reach: { current: (snap.traffic_views || 0) + (snap.traffic_uniques || 0), velocity: v.reach }, Interest: { current: (snap.stars || 0) + (snap.forks || 0), velocity: v.interest }, Engagement: { current: (snap.clones || 0) + (snap.clones_uniques || 0), velocity: v.engagement } } };
-      case 'reddit': return { lanes: { Reach: { current: snap.view_count || 0, velocity: v.reach }, Interest: { current: snap.upvotes || 0, velocity: v.interest }, Engagement: { current: snap.comment_count || 0, velocity: v.engagement } } };
-      case 'ga4': return { lanes: { Reach: { current: snap.pageviews || 0, velocity: v.reach }, Interest: { current: snap.users || 0, velocity: v.interest }, Engagement: { current: snap.sessions || 0, velocity: v.engagement } } };
-      case 'bing': return { lanes: { Reach: { current: snap.impressions || 0, velocity: v.reach }, Interest: { current: snap.clicks || 0, velocity: v.interest }, Engagement: { current: snap.ctr ? Math.round(snap.ctr * 1000) / 10 : 0, velocity: v.engagement } } };
-      default: return { lanes: { Reach: { current: 0, velocity: 0 }, Interest: { current: 0, velocity: 0 }, Engagement: { current: 0, velocity: 0 } } };
-    }
-  });
+  // Lane summary from platform-level unified_metrics
+  const laneSummaryItems = platformData ? [{
+    lanes: {
+      Reach: { current: platformData.reach ?? 0, velocity: platformData.velocity?.reach ?? 0 },
+      Interest: { current: platformData.interest ?? 0, velocity: platformData.velocity?.interest ?? 0 },
+      Engagement: { current: platformData.engagement ?? 0, velocity: platformData.velocity?.engagement ?? 0 },
+    },
+  }] : [];
 
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
@@ -226,8 +218,8 @@ export default function Platform() {
             <>
               <LaneSummary
                 items={laneSummaryItems}
-                performanceScore={dashboardItems.length > 0 ? dashboardItems.reduce((s: number, i: any) => s + (i.performanceScore || 0), 0) / dashboardItems.length : undefined}
-                performanceVelocity={dashboardItems.length > 0 ? dashboardItems.reduce((s: number, i: any) => s + (i.performanceVelocity || 0), 0) / dashboardItems.length : undefined}
+                performanceScore={platformData?.performanceScore}
+                performanceVelocity={platformData?.performanceVelocity}
                 activeCard={activeChart}
                 onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
               />
@@ -312,24 +304,18 @@ export default function Platform() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
               {items.map((item, i) => {
-                // Find matching dashboard item for this tracked item
                 const dashItem = dashboardItems.find(d => d.id === item.id);
-                const statItem: StatCardItem = dashItem ? {
+                const statItem: StatCardItem = {
                   id: item.id,
                   platform: name,
                   display_name: item.display_name,
                   tags: (itemTags[item.id] || []).map(t => t.name),
-                  lanes: mapItemToLanes(dashItem, platform || ''),
-                } : {
-                  id: item.id,
-                  platform: name,
-                  display_name: item.display_name,
-                  tags: (itemTags[item.id] || []).map(t => t.name),
-                  lanes: {
+                  lanes: dashItem ? itemToLanes(dashItem) : {
                     Reach: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
                     Interest: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
                     Engagement: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
                   },
+                  performanceScore: dashItem?.performanceScore,
                 };
 
                 return (
