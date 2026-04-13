@@ -81,27 +81,18 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
                 <div style={{ fontSize: 12, color: C.textMid, fontFamily: font, textTransform: 'capitalize' }}>{timeLabel}</div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
               </div>
-              {d.velocity !== 0 ? (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>Change</div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: vc, fontFamily: font, lineHeight: 1 }}>
-                      {velSign(d.velocity)}{fmt(Math.abs(d.velocity))}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>% Change</div>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: vc, fontFamily: font, lineHeight: 1 }}>
-                      {(() => { const prev = d.current - d.velocity; return prev !== 0 ? `${d.velocity > 0 ? '+' : ''}${((d.velocity / prev) * 100).toFixed(1)}%` : 'new'; })()}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>change</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: C.textFaint, fontFamily: font, lineHeight: 1 }}>--</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>Change</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: d.velocity !== 0 ? vc : C.textFaint, fontFamily: font, lineHeight: 1 }}>
+                  {d.velocity !== 0 ? `${velSign(d.velocity)}${fmt(Math.abs(d.velocity))}` : '0'}
                 </div>
-              )}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>% Change</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: d.velocity !== 0 ? vc : C.textFaint, fontFamily: font, lineHeight: 1 }}>
+                  {(() => { if (d.velocity === 0) return '0%'; const prev = d.current - d.velocity; return prev !== 0 ? `${d.velocity > 0 ? '+' : ''}${((d.velocity / prev) * 100).toFixed(1)}%` : 'new'; })()}
+                </div>
+              </div>
             </div>
           </div>
         );
