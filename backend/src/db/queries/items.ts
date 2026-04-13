@@ -49,6 +49,8 @@ export function deleteItem(id: number): boolean {
   for (const table of ['github_daily', 'github_weekly', 'github_monthly', 'ga4_daily', 'ga4_weekly', 'ga4_monthly', 'bing_daily', 'bing_weekly', 'bing_monthly']) {
     db.prepare(`DELETE FROM ${table} WHERE tracked_item_id = ?`).run(id);
   }
+  // Peak metrics for this item
+  db.prepare('DELETE FROM peak_metrics WHERE tracked_item_id = ?').run(id);
   const result = db.prepare('DELETE FROM tracked_items WHERE id = ?').run(id);
   return result.changes > 0;
 }

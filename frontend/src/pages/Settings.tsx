@@ -637,7 +637,7 @@ function TrackedItemsTab() {
                   )}
                   {confirmDeleteId === item.id ? (
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <span style={{ fontSize: 9, color: '#c00', fontFamily: font }}>Permanently delete?</span>
+                      <span style={{ fontSize: 11, color: '#c00', fontFamily: font, fontWeight: 700 }}>Permanently delete?</span>
                       <button onClick={() => handleDelete(item.id)} style={{
                         padding: '4px 8px', background: '#e8380d', border: 'none',
                         borderRadius: 5, color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: font,

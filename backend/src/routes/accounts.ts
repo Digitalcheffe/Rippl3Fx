@@ -6,6 +6,7 @@ import { purgeTrackedMetricsByAccount } from '../db/queries/tracked';
 import { collectGithub } from '../platforms/github';
 import { collectGA4 } from '../platforms/ga4';
 import { collectBing } from '../platforms/bing';
+import { collectAccountStats } from '../platforms/account-stats';
 import { insertPollLog } from '../db/queries/logs';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
@@ -155,12 +156,6 @@ router.post('/:id/poll-now', async (req: Request, res: Response) => {
   const db = require('../db/connection').default;
   const fullAccount = db.prepare('SELECT * FROM metric_accounts WHERE id = ?').get(id) as any;
 
-  const items = getActiveTrackedItems(id);
-  if (items.length === 0) {
-    res.status(400).json({ error: 'No active tracked items for this account' });
-    return;
-  }
-
   let credentials: any;
   try {
     credentials = decryptCredentials(fullAccount.credentials);
@@ -172,6 +167,14 @@ router.post('/:id/poll-now', async (req: Request, res: Response) => {
   let allSuccess = true;
   const results: Array<{ item: string; success: boolean }> = [];
 
+  // 1. Collect account-level stats → unified_metrics
+  const acctResult = await collectAccountStats(id, fullAccount.platform, credentials);
+  results.push({ item: `${fullAccount.platform} account`, success: acctResult.success });
+  if (!acctResult.success) allSuccess = false;
+  insertPollLog({ metric_account_id: id, platform: fullAccount.platform, level: acctResult.success ? 'info' : 'error', message: acctResult.success ? `Poll Now: account-level stats collected` : `Poll Now: account-level stats failed — ${acctResult.error}` });
+
+  // 2. Collect per-tracked-item data
+  const items = getActiveTrackedItems(id);
   for (const item of items) {
     let result: { success: boolean; error?: string } = { success: false, error: 'Unknown platform' };
     try {

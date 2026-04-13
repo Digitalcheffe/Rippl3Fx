@@ -190,6 +190,15 @@ export default function Platform() {
               }}>{range}</button>
             ))}
           </div>
+          <button onClick={handlePollNow} disabled={polling} style={{
+            padding: '5px 12px', background: C.up + '15',
+            border: `1px solid ${C.up}55`, borderRadius: 6,
+            color: C.up, fontSize: 10, fontWeight: 700,
+            cursor: polling ? 'wait' : 'pointer', fontFamily: font,
+            opacity: polling ? 0.6 : 1, textTransform: 'uppercase',
+          }}>
+            {polling ? 'Polling...' : 'Poll Now'}
+          </button>
           <LaneInfoButton onClick={() => setShowInfo(!showInfo)} />
         </div>
       </div>
@@ -260,15 +269,6 @@ export default function Platform() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', fontFamily: font }}>Tracked Items</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handlePollNow} disabled={polling} style={{
-                padding: '4px 12px', background: C.up + '15',
-                border: `1px solid ${C.up}40`, borderRadius: 5,
-                color: C.up, fontSize: 11, fontWeight: 700,
-                cursor: polling ? 'wait' : 'pointer', fontFamily: font,
-                opacity: polling ? 0.6 : 1,
-              }}>
-                {polling ? 'Polling...' : 'Poll Now'}
-              </button>
               <button onClick={() => setShowAddItem(!showAddItem)} style={{
                 padding: '4px 12px', background: platformColor + '15',
                 border: `1px solid ${platformColor}40`, borderRadius: 5,
