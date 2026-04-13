@@ -82,7 +82,7 @@ export default function DiscoveryPanel({ accountId, platform, onItemTracked }: D
   return (
     <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 18px', marginBottom: 16, boxShadow: '0 2px 8px rgba(30,58,95,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', fontFamily: font }}>Discoverable Content</div>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', fontFamily: font }}>Discoverable Content</div>
         <button onClick={() => setExpanded(!expanded)} style={{
           padding: '4px 12px', background: platformColor + '18',
           border: `1px solid ${platformColor}40`, borderRadius: 6,

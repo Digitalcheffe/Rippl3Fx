@@ -50,7 +50,7 @@ export default function PerformanceTrend({ items, platform, width = 500, height 
     <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20, boxShadow: '0 2px 8px rgba(30,58,95,0.07)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>Performance Trend</div>
+          <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>Performance Trend</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text, fontFamily: font }}>{platform ? `${platform} momentum over time` : 'Cross-platform momentum over time'}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -78,7 +78,7 @@ export default function PerformanceTrend({ items, platform, width = 500, height 
           return (
             <g key={pct}>
               <line x1={padL} y1={y} x2={width - padR} y2={y} stroke={C.border} strokeWidth={0.5} strokeDasharray="4,4" />
-              <text x={padL - 4} y={y + 3} fontSize="8" fill={C.textFaint} textAnchor="end" fontFamily="monospace">{pct}%</text>
+              <text x={padL - 4} y={y + 3} fontSize="9" fill={C.textFaint} textAnchor="end" fontFamily="monospace">{pct}%</text>
             </g>
           );
         })}
@@ -120,7 +120,7 @@ export default function PerformanceTrend({ items, platform, width = 500, height 
         })()}
 
         {DAY_LABELS.map((l, i) => (
-          <text key={l} x={toX(i)} y={height - 2} fontSize="8" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
+          <text key={l} x={toX(i)} y={height - 2} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
         ))}
       </svg>
 

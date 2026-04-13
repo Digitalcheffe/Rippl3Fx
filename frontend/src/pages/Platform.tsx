@@ -176,7 +176,7 @@ export default function Platform() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
+          <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>{name}</h1>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -265,7 +265,7 @@ export default function Platform() {
 
           {/* Tracked items header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', fontFamily: font }}>Tracked Items</div>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', fontFamily: font }}>Tracked Items</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={handlePollNow} disabled={polling} style={{
                 padding: '4px 12px', background: C.up + '15',

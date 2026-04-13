@@ -69,17 +69,17 @@ function LayeredChartSVG({ items, width, height, lane }: { items: LaneChartItem[
         return (
           <g key={pct}>
             <line x1={padL} y1={y} x2={width - padR} y2={y} stroke={C.border} strokeWidth={0.5} strokeDasharray="4,4" />
-            <text x={padL - 4} y={y + 3} fontSize="8" fill={C.textFaint} textAnchor="end" fontFamily="monospace">{pct}</text>
+            <text x={padL - 4} y={y + 3} fontSize="9" fill={C.textFaint} textAnchor="end" fontFamily="monospace">{pct}</text>
           </g>
         );
       })}
 
       {/* Y axis label */}
-      <text x={8} y={padT + cH / 2} fontSize="8" fill={laneColor} textAnchor="middle" fontFamily="monospace" transform={`rotate(-90, 8, ${padT + cH / 2})`}>{lane}</text>
+      <text x={8} y={padT + cH / 2} fontSize="9" fill={laneColor} textAnchor="middle" fontFamily="monospace" transform={`rotate(-90, 8, ${padT + cH / 2})`}>{lane}</text>
 
       {/* X axis labels */}
       {DAY_LABELS.map((l, i) => (
-        <text key={l} x={toX(i)} y={height - 4} fontSize="8" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
+        <text key={l} x={toX(i)} y={height - 4} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
       ))}
 
       {/* Platform areas + lines */}
@@ -133,8 +133,8 @@ function LayeredChartSVG({ items, width, height, lane }: { items: LaneChartItem[
             {lines.map((l, li) => (
               <g key={l.name}>
                 <circle cx={tipX + 10} cy={tipY + 24 + li * 14} r={3} fill={l.color} />
-                <text x={tipX + 18} y={tipY + 27 + li * 14} fontSize="8" fill={C.textSoft} fontFamily={font}>{l.name}</text>
-                <text x={tipX + tipW - 8} y={tipY + 27 + li * 14} fontSize="8" fontWeight="700" fill={C.text} fontFamily={font} textAnchor="end">{l.value.toFixed(1)}</text>
+                <text x={tipX + 18} y={tipY + 27 + li * 14} fontSize="9" fill={C.textSoft} fontFamily={font}>{l.name}</text>
+                <text x={tipX + tipW - 8} y={tipY + 27 + li * 14} fontSize="9" fontWeight="700" fill={C.text} fontFamily={font} textAnchor="end">{l.value.toFixed(1)}</text>
               </g>
             ))}
           </g>
@@ -178,7 +178,7 @@ export default function LayeredInterestChart({ items, lane = 'Interest', tag, on
             return (
               <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <div style={{ width: 12, height: 2, background: color, borderRadius: 1 }} />
-                <span style={{ fontSize: 9, color: C.textFaint, fontFamily: font }}>{displayKey}</span>
+                <span style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>{displayKey}</span>
               </div>
             );
           })}

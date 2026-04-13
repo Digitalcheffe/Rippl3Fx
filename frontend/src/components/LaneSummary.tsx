@@ -94,7 +94,7 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
             {pv !== 0 ? `${velArrow(pv)} ${velSign(pv)}${Math.abs(pv).toFixed(1)} ${timeLabel}` : 'No change yet'}
           </div>
           {weights && (
-            <div style={{ fontSize: 8, color: C.textFaint, fontFamily: font, marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font, marginTop: 4 }}>
               R {Math.round(weights.reach * 100)}% · I {Math.round(weights.interest * 100)}% · E {Math.round(weights.engagement * 100)}%
             </div>
           )}

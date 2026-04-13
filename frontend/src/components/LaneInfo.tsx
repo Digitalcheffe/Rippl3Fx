@@ -42,7 +42,7 @@ export function LaneTooltip({ lane, platform }: { lane: string; platform?: strin
       <span
         onMouseEnter={() => setShow(true)}
         onMouseLeave={() => setShow(false)}
-        style={{ fontSize: 9, color: C.textFaint, cursor: 'help', opacity: 0.6 }}
+        style={{ fontSize: 11, color: C.textFaint, cursor: 'help', opacity: 0.8 }}
       >?</span>
       {show && (
         <div style={{
@@ -52,7 +52,7 @@ export function LaneTooltip({ lane, platform }: { lane: string; platform?: strin
           boxShadow: '0 4px 16px rgba(13,31,53,0.3)',
         }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: C.text, fontFamily: font, marginBottom: 3 }}>{info.metrics}</div>
-          <div style={{ fontSize: 9, color: C.textSoft, fontFamily: font, lineHeight: 1.4 }}>{info.description}</div>
+          <div style={{ fontSize: 10, color: C.textSoft, fontFamily: font, lineHeight: 1.4 }}>{info.description}</div>
         </div>
       )}
     </span>
@@ -91,9 +91,9 @@ export function LaneInfoPanel({ platform, onClose }: { platform?: string; onClos
                 const laneColor = lane === 'Performance' ? C.accent : (C[lane as keyof typeof C] || C.textMid) as string;
                 return (
                   <div key={lane} style={{ padding: '6px 8px', background: C.bg, borderRadius: 6, borderTop: `2px solid ${laneColor}` }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: laneColor, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{lane}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: laneColor, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{lane}</div>
                     <div style={{ fontSize: 10, fontWeight: 600, color: C.text, fontFamily: font, marginBottom: 2 }}>{info.metrics}</div>
-                    <div style={{ fontSize: 8, color: C.textFaint, fontFamily: font, lineHeight: 1.3 }}>{info.description}</div>
+                    <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font, lineHeight: 1.3 }}>{info.description}</div>
                   </div>
                 );
               })}

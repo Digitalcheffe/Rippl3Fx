@@ -52,7 +52,7 @@ function LaneRow({ lane, data, compact = false, distPct }: LaneRowProps) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div style={{ width: compact ? 60 : 72, flexShrink: 0, textAlign: 'right' }}>
-        <div style={{ fontSize: 9, color: C.textFaint, textTransform: 'uppercase', letterSpacing: 1, fontFamily: font }}>{lane}</div>
+        <div style={{ fontSize: 10, color: C.textFaint, textTransform: 'uppercase', letterSpacing: 1, fontFamily: font }}>{lane}</div>
         <div style={{ fontSize: compact ? 14 : 16, fontWeight: 900, color: C.text, fontFamily: font, lineHeight: 1.2, letterSpacing: -0.5 }}>{fmt(data.current)}</div>
       </div>
       <Sparkline data={data.history} color={color} width={compact ? 64 : 76} height={22} />
@@ -62,7 +62,7 @@ function LaneRow({ lane, data, compact = false, distPct }: LaneRowProps) {
         </div>
       )}
       {distPct != null && (
-        <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font, minWidth: 36, textAlign: 'right' }}>
+        <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font, minWidth: 36, textAlign: 'right' }}>
           {distPct.toFixed(1)}%
         </div>
       )}
@@ -133,7 +133,7 @@ export default function StatCard({ item, index = 0, onClick }: { item: StatCardI
         <>
           <div style={{ height: 1, background: C.border }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 9, color: C.accent, textTransform: 'uppercase', letterSpacing: 1, fontFamily: font, fontWeight: 700 }}>Performance</span>
+            <span style={{ fontSize: 10, color: C.accent, textTransform: 'uppercase', letterSpacing: 1, fontFamily: font, fontWeight: 700 }}>Performance</span>
             <span style={{ fontSize: 14, fontWeight: 900, color: C.accent, fontFamily: font }}>{item.performanceScore.toFixed(1)}%</span>
           </div>
         </>

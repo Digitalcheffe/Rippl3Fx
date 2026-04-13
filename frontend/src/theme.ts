@@ -9,7 +9,7 @@ export const C = {
   text:        '#0d1f35',
   textMid:     '#2d5282',
   textSoft:    '#5a7fa8',
-  textFaint:   '#8baac8',
+  textFaint:   '#6b8db0',
   border:      '#cfe0f0',
   borderMid:   '#a8c4e0',
   accent:      '#e8622a',
