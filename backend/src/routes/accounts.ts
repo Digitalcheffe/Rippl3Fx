@@ -56,10 +56,12 @@ router.post('/', (req: Request, res: Response) => {
   const account = createAccount(platform, display_name, encrypted, interval);
   res.status(201).json(account);
 
-  // Fire-and-forget: collect account-level stats immediately
-  collectAccountStats(account.id, platform, credentials).catch(err =>
-    console.error(`[Account] Auto-poll failed for new account ${account.id}: ${err.message}`)
-  );
+  // Fire-and-forget: backfill 14 days of account-level stats
+  import('../platforms/account-stats').then(({ backfillAccountStats }) => {
+    backfillAccountStats(account.id, platform, credentials).catch(err =>
+      console.error(`[Account] Auto-backfill failed for new account ${account.id}: ${err.message}`)
+    );
+  });
 });
 
 // PUT /api/accounts/:id
