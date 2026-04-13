@@ -170,39 +170,31 @@ router.get('/:id/stats', async (req: Request, res: Response) => {
         const totalForks = repos.reduce((s, r) => s + (r.forks_count || 0), 0);
         const totalWatchers = repos.reduce((s, r) => s + ((r as any).subscribers_count || 0), 0);
 
-        // Aggregate from tracked item snapshots for traffic/clones/releases
-        const ghTotals = db.prepare(`
-          SELECT MAX(traffic_views) as traffic_views, MAX(clones) as clones, MAX(release_downloads) as release_downloads
-          FROM github_snapshots gs
-          JOIN tracked_items ti ON gs.tracked_item_id = ti.id
-          WHERE ti.metric_account_id = ?
-        `).get(id) as any;
+        // Peak values from unified_metrics (platform-level)
+        const ghPeaks = db.prepare(`
+          SELECT MAX(reach_value) as peak_reach, MAX(engagement_value) as peak_engagement
+          FROM unified_metrics WHERE platform = 'github' AND period_type = 'daily'
+        `).get() as any;
 
         // Count releases across tracked repos
         let totalReleases = 0;
         try {
-          const trackedRepos = db.prepare('SELECT platform_identifier FROM tracked_items WHERE metric_account_id = ? AND is_active = 1').all(id) as Array<{ platform_identifier: string }>;
-          for (const tr of trackedRepos) {
-            const [owner, repo] = tr.platform_identifier.split('/');
-            if (owner && repo) {
+          for (const r of repos) {
+            if (r.name) {
               try {
-                const { data: releases } = await octokit.repos.listReleases({ owner, repo, per_page: 1 });
-                const { headers } = await octokit.repos.listReleases({ owner, repo, per_page: 1 });
-                // Parse link header for total count, or just count from first page
-                const releaseCount = await octokit.repos.listReleases({ owner, repo, per_page: 100 });
-                totalReleases += releaseCount.data.length;
+                const { data: releases } = await octokit.repos.listReleases({ owner: user.login, repo: r.name, per_page: 100 });
+                totalReleases += releases.length;
               } catch { /* ignore */ }
             }
           }
         } catch { /* ignore */ }
 
         stats = [
-          { label: 'Traffic Views', value: fmtNum(ghTotals?.traffic_views || 0) },
+          { label: 'Peak Traffic Views', value: fmtNum(ghPeaks?.peak_reach || 0) },
           { label: 'Total Stars', value: fmtNum(totalStars) },
           { label: 'Watchers', value: fmtNum(totalWatchers) },
           { label: 'Total Forks', value: fmtNum(totalForks) },
-          { label: 'Clones', value: fmtNum(ghTotals?.clones || 0) },
-          { label: 'Release Downloads', value: fmtNum(ghTotals?.release_downloads || 0) },
+          { label: 'Peak Clones', value: fmtNum(ghPeaks?.peak_engagement || 0) },
           { label: 'Releases', value: fmtNum(totalReleases) },
           { label: 'Public Repos', value: fmtNum(user.public_repos) },
         ];
@@ -211,43 +203,30 @@ router.get('/:id/stats', async (req: Request, res: Response) => {
 
       case 'ga4': {
         const creds = credentials as GA4Credentials;
-        // Aggregate from collected snapshots
-        const ga4Totals = db.prepare(`
-          SELECT SUM(sessions) as sessions, SUM(pageviews) as pageviews, SUM(users) as users,
-                 AVG(engagement_rate) as engagement_rate
-          FROM ga4_snapshots gs
-          JOIN tracked_items ti ON gs.tracked_item_id = ti.id
-          WHERE ti.metric_account_id = ?
-        `).get(id) as any;
+        const ga4Peaks = db.prepare(`
+          SELECT MAX(reach_value) as peak_reach, MAX(interest_value) as peak_interest, MAX(engagement_value) as peak_engagement
+          FROM unified_metrics WHERE platform = 'ga4' AND period_type = 'daily'
+        `).get() as any;
         stats = [
           { label: 'Property ID', value: creds.propertyId },
-          { label: 'Total Sessions', value: fmtNum(ga4Totals?.sessions || 0) },
-          { label: 'Total Pageviews', value: fmtNum(ga4Totals?.pageviews || 0) },
-          { label: 'Total Users', value: fmtNum(ga4Totals?.users || 0) },
+          { label: 'Peak Pageviews', value: fmtNum(ga4Peaks?.peak_reach || 0) },
+          { label: 'Peak Users', value: fmtNum(ga4Peaks?.peak_interest || 0) },
+          { label: 'Peak Sessions', value: fmtNum(ga4Peaks?.peak_engagement || 0) },
         ];
-        if (ga4Totals?.engagement_rate) {
-          stats.push({ label: 'Avg Engagement', value: `${(ga4Totals.engagement_rate * 100).toFixed(1)}%` });
-        }
         break;
       }
 
       case 'bing': {
         const creds = credentials as BingCredentials;
-        const bingTotals = db.prepare(`
-          SELECT SUM(impressions) as impressions, SUM(clicks) as clicks,
-                 AVG(ctr) as ctr, AVG(avg_rank) as avg_rank
-          FROM bing_snapshots bs
-          JOIN tracked_items ti ON bs.tracked_item_id = ti.id
-          WHERE ti.metric_account_id = ?
-        `).get(id) as any;
+        const bingPeaks = db.prepare(`
+          SELECT MAX(reach_value) as peak_reach, MAX(interest_value) as peak_interest, MAX(engagement_value) as peak_engagement
+          FROM unified_metrics WHERE platform = 'bing' AND period_type = 'daily'
+        `).get() as any;
         stats = [
           { label: 'Site URL', value: creds.siteUrl },
-          { label: 'Total Impressions', value: fmtNum(bingTotals?.impressions || 0) },
-          { label: 'Total Clicks', value: fmtNum(bingTotals?.clicks || 0) },
+          { label: 'Peak Impressions', value: fmtNum(bingPeaks?.peak_reach || 0) },
+          { label: 'Peak Clicks', value: fmtNum(bingPeaks?.peak_interest || 0) },
         ];
-        if (bingTotals?.avg_rank) {
-          stats.push({ label: 'Avg Rank', value: bingTotals.avg_rank.toFixed(1) });
-        }
         break;
       }
     }

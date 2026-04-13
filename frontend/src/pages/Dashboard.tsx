@@ -194,46 +194,51 @@ export default function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
           {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
         </div>
-      ) : items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: C.textSoft, fontSize: 13, fontFamily: font }}>
-          {activeTag === 'All' ? (
-            <>No tracked items yet.{' '}<span onClick={() => navigate('/settings')} style={{ color: C.accent, cursor: 'pointer', textDecoration: 'underline' }}>Add some in Settings</span>.</>
-          ) : (
-            <>No items tagged "{activeTag}" yet.</>
-          )}
-        </div>
       ) : (
         <>
-          {/* Lane summary — clickable cards */}
-          <LaneSummary
-            items={laneSummaryItems}
-            performanceScore={totals?.performanceScore}
-            performanceVelocity={totals?.performanceVelocity}
-            weights={weights}
-            activeCard={activeChart}
-            onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
-            timeLabel={formatPeriodLabel(timeRange, Object.values(data?.platforms || {})[0]?.periodStart, Object.values(data?.platforms || {})[0]?.periodEnd)}
-            peaks={totals?.peaks}
-          />
-
-          {/* Always-visible lane chart — shows all lanes or single lane on card click */}
-          {items.length > 0 && (
-            <div style={{ marginTop: 12, marginBottom: 16 }}>
-              <LayeredInterestChart
-                items={items}
-                lane={activeChart || 'all'}
-                tag={activeTag !== 'All' ? activeTag : undefined}
-                range={timeRange}
-              />
-            </div>
+          {/* Lane summary — always show platform-level data */}
+          {laneSummaryItems.length > 0 && (
+            <LaneSummary
+              items={laneSummaryItems}
+              performanceScore={totals?.performanceScore}
+              performanceVelocity={totals?.performanceVelocity}
+              weights={weights}
+              activeCard={activeChart}
+              onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
+              timeLabel={formatPeriodLabel(timeRange, Object.values(data?.platforms || {})[0]?.periodStart, Object.values(data?.platforms || {})[0]?.periodEnd)}
+              peaks={totals?.peaks}
+            />
           )}
 
-          {/* Platform / item stat cards */}
+          {/* Lane chart — use items if available, otherwise build from platform history */}
+          {(() => {
+            const chartItems = items.length > 0 ? items : Object.entries(data?.platforms || {}).map(([p, d]: [string, any]) => ({
+              platform: p,
+              reachHistory: d.reachHistory || [0,0,0,0,0,0,0],
+              interestHistory: d.interestHistory || [0,0,0,0,0,0,0],
+              engagementHistory: d.engagementHistory || [0,0,0,0,0,0,0],
+              performanceHistory: d.performanceHistory || [0,0,0,0,0,0,0],
+            }));
+            return chartItems.length > 0 ? (
+              <div style={{ marginTop: 12, marginBottom: 16 }}>
+                <LayeredInterestChart
+                  items={chartItems}
+                  lane={activeChart || 'all'}
+                  tag={activeTag !== 'All' ? activeTag : undefined}
+                  range={timeRange}
+                />
+              </div>
+            ) : null;
+          })()}
+
+          {/* Platform stat cards (always) or tagged item cards (when tag selected) */}
           <div style={{ display: 'grid', gridTemplateColumns: showingTagged ? 'repeat(auto-fill, minmax(360px, 1fr))' : `repeat(${Math.min(platformStatItems.length, 3)}, 1fr)`, gap: 14 }}>
             {showingTagged
-              ? tagStatItems.map((item, i) => (
-                  <StatCard key={item.id} item={item} index={i} />
-                ))
+              ? tagStatItems.length > 0
+                ? tagStatItems.map((item, i) => (
+                    <StatCard key={item.id} item={item} index={i} />
+                  ))
+                : <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px 0', color: C.textSoft, fontSize: 13, fontFamily: font }}>No items tagged "{activeTag}" yet.</div>
               : platformStatItems.map((item, i) => (
                   <StatCard key={item.platform} item={item} index={i} onClick={() => navigate(`/platform/${item.platform.toLowerCase()}`)} />
                 ))
