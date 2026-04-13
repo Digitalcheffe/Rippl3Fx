@@ -105,5 +105,8 @@ export function writeMetrics(
 ): void {
   const lanes = mapToLanes(platform, rawRow);
   writeTrackedMetric(trackedItemId, platform, periodType, periodStart, periodEnd, lanes);
-  refreshUnifiedMetric(platform, periodType, periodStart, periodEnd);
+  // Skip unified refresh for hourly — cumulative snapshots don't sum meaningfully
+  if (periodType !== 'hourly') {
+    refreshUnifiedMetric(platform, periodType, periodStart, periodEnd);
+  }
 }

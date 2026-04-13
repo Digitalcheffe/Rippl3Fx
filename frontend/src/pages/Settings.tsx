@@ -316,8 +316,18 @@ function AccountsTab() {
 
   const connectedPlatforms = accounts.map(a => a.platform);
 
+  const handleDeactivate = async (id: number) => {
+    await apiPost(`/accounts/${id}/deactivate`);
+    loadAccounts();
+  };
+
+  const handleReactivate = async (id: number) => {
+    await apiPost(`/accounts/${id}/reactivate`);
+    loadAccounts();
+  };
+
   const handleDelete = async (id: number) => {
-    if (!confirm('Remove this account? All tracked items will be deleted.')) return;
+    if (!confirm('Permanently delete this account? All items and metric data will be purged. This cannot be undone.')) return;
     await apiDelete(`/accounts/${id}`);
     loadAccounts();
   };
@@ -342,7 +352,12 @@ function AccountsTab() {
                   {isExpanded ? 'Hide Items' : 'Backfill Items'}
                 </button>
                 <button onClick={() => { setEditAccount(a); setShowModal(true); }} style={{ padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMid, fontSize: 11, cursor: 'pointer', fontFamily: font }}>Edit</button>
-                <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Remove</button>
+                {a.is_active ? (
+                  <button onClick={() => handleDeactivate(a.id)} style={{ padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textFaint, fontSize: 11, cursor: 'pointer', fontFamily: font }}>Deactivate</button>
+                ) : (
+                  <button onClick={() => handleReactivate(a.id)} style={{ padding: '4px 10px', background: C.up + '15', border: `1px solid ${C.up}55`, borderRadius: 5, color: C.up, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: font }}>Reactivate</button>
+                )}
+                <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Delete</button>
               </div>
             </div>
             {isExpanded && (

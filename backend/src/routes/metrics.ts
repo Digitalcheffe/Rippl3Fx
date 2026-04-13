@@ -71,23 +71,58 @@ router.get('/dashboard', (req: Request, res: Response) => {
     };
   });
 
-  // Platform-level data from unified_metrics
+  // Platform-level data: from unified_metrics when no tag filter, from items when tag-filtered
   const platforms: Record<string, any> = {};
-  for (const p of ['github', 'ga4', 'bing']) {
-    const { current, previous } = getUnifiedPair(p, range);
-    if (current) {
-      platforms[p] = {
-        reach: current.reach_value ?? 0,
-        interest: current.interest_value ?? 0,
-        engagement: current.engagement_value ?? 0,
-        performanceScore: Math.round((current.performance_score ?? 0) * 100) / 100,
-        velocity: {
-          reach: (current.reach_value ?? 0) - (previous?.reach_value ?? 0),
-          interest: (current.interest_value ?? 0) - (previous?.interest_value ?? 0),
-          engagement: (current.engagement_value ?? 0) - (previous?.engagement_value ?? 0),
-        },
-        performanceVelocity: Math.round(((current.performance_score ?? 0) - (previous?.performance_score ?? 0)) * 100) / 100,
-      };
+  if (tagFilter) {
+    // Tag-filtered: compute platform totals from filtered items
+    for (const item of items) {
+      const p = item.platform;
+      if (!platforms[p]) {
+        platforms[p] = { reach: 0, interest: 0, engagement: 0, performanceScore: 0, velocity: { reach: 0, interest: 0, engagement: 0 }, performanceVelocity: 0 };
+      }
+      platforms[p].reach += item.reach;
+      platforms[p].interest += item.interest;
+      platforms[p].engagement += item.engagement;
+      platforms[p].performanceScore += item.performanceScore;
+      platforms[p].velocity.reach += item.velocity.reach;
+      platforms[p].velocity.interest += item.velocity.interest;
+      platforms[p].velocity.engagement += item.velocity.engagement;
+      platforms[p].performanceVelocity += item.performanceVelocity;
+    }
+  } else if (range === 'hourly') {
+    // Hourly: compute from items (unified_metrics not populated for hourly)
+    for (const item of items) {
+      const p = item.platform;
+      if (!platforms[p]) {
+        platforms[p] = { reach: 0, interest: 0, engagement: 0, performanceScore: 0, velocity: { reach: 0, interest: 0, engagement: 0 }, performanceVelocity: 0 };
+      }
+      platforms[p].reach += item.reach;
+      platforms[p].interest += item.interest;
+      platforms[p].engagement += item.engagement;
+      platforms[p].performanceScore += item.performanceScore;
+      platforms[p].velocity.reach += item.velocity.reach;
+      platforms[p].velocity.interest += item.velocity.interest;
+      platforms[p].velocity.engagement += item.velocity.engagement;
+      platforms[p].performanceVelocity += item.performanceVelocity;
+    }
+  } else {
+    // Daily/weekly/monthly: use unified_metrics (platform-wide totals)
+    for (const p of ['github', 'ga4', 'bing']) {
+      const { current, previous } = getUnifiedPair(p, range);
+      if (current) {
+        platforms[p] = {
+          reach: current.reach_value ?? 0,
+          interest: current.interest_value ?? 0,
+          engagement: current.engagement_value ?? 0,
+          performanceScore: Math.round((current.performance_score ?? 0) * 100) / 100,
+          velocity: {
+            reach: (current.reach_value ?? 0) - (previous?.reach_value ?? 0),
+            interest: (current.interest_value ?? 0) - (previous?.interest_value ?? 0),
+            engagement: (current.engagement_value ?? 0) - (previous?.engagement_value ?? 0),
+          },
+          performanceVelocity: Math.round(((current.performance_score ?? 0) - (previous?.performance_score ?? 0)) * 100) / 100,
+        };
+      }
     }
   }
 
