@@ -271,6 +271,7 @@ function AccountsTab() {
   const [expandedAccount, setExpandedAccount] = useState<number | null>(null);
   const [accountItems, setAccountItems] = useState<Array<{ id: number; display_name: string; platform_identifier: string }>>([]);
   const [backfillingId, setBackfillingId] = useState<number | null>(null);
+  const [confirmDeleteAccountId, setConfirmDeleteAccountId] = useState<number | null>(null);
 
   const loadAccounts = async () => {
     try {
@@ -327,8 +328,8 @@ function AccountsTab() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Permanently delete this account? All items and metric data will be purged. This cannot be undone.')) return;
     await apiDelete(`/accounts/${id}`);
+    setConfirmDeleteAccountId(null);
     loadAccounts();
   };
 
@@ -357,7 +358,15 @@ function AccountsTab() {
                 ) : (
                   <button onClick={() => handleReactivate(a.id)} style={{ padding: '4px 10px', background: C.up + '15', border: `1px solid ${C.up}55`, borderRadius: 5, color: C.up, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: font }}>Reactivate</button>
                 )}
-                <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Delete</button>
+                {confirmDeleteAccountId === a.id ? (
+                  <>
+                    <span style={{ fontSize: 11, color: '#c00', fontFamily: font, fontWeight: 700 }}>Permanently delete?</span>
+                    <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 8px', background: '#e8380d', border: 'none', borderRadius: 5, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: font }}>Yes</button>
+                    <button onClick={() => setConfirmDeleteAccountId(null)} style={{ padding: '4px 8px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMid, fontSize: 11, cursor: 'pointer', fontFamily: font }}>No</button>
+                  </>
+                ) : (
+                  <button onClick={() => setConfirmDeleteAccountId(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Delete</button>
+                )}
               </div>
             </div>
             {isExpanded && (
