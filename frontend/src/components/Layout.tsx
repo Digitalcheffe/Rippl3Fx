@@ -5,7 +5,6 @@ const font = "'DM Mono', monospace";
 
 const NAV_ITEMS = [
   { key: '/', label: 'All Metrics', color: C.accent },
-  { key: '/reddit', label: 'Reddit', color: C.Reddit },
   { key: '/github', label: 'GitHub', color: C.GitHub },
   { key: '/ga4', label: 'GA4', color: C.GA4 },
   { key: '/bing', label: 'Bing', color: C.Bing },

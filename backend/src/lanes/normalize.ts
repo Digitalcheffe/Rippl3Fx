@@ -12,7 +12,6 @@ export function normalizeValue(value: number, historicalPeak: number): number {
 
 const SNAPSHOT_TABLES: Record<string, string> = {
   github: 'github_snapshots',
-  reddit: 'reddit_snapshots',
   ga4:    'ga4_snapshots',
   bing:   'bing_snapshots',
 };

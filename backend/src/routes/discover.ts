@@ -1,10 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { Octokit } from '@octokit/rest';
-import Snoowrap from 'snoowrap';
 import axios from 'axios';
 import db from '../db/connection';
 import { decryptCredentials } from '../crypto/credentials';
-import type { GithubCredentials, RedditCredentials, GA4Credentials, BingCredentials } from '../types';
+import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 const router = Router();
 
@@ -41,24 +40,6 @@ router.get('/:id/discover', async (req: Request, res: Response) => {
           name: r.full_name,
           identifier: r.full_name,
           description: `${r.stargazers_count} stars · ${r.language || 'no language'}`,
-        }));
-        break;
-      }
-
-      case 'reddit': {
-        const creds = credentials as RedditCredentials;
-        const reddit = new Snoowrap({
-          userAgent: 'Rippl3FX/1.0',
-          clientId: creds.clientId,
-          clientSecret: creds.clientSecret,
-          username: creds.username,
-          password: creds.password,
-        });
-        const submissions = await (reddit.getMe().getSubmissions({ limit: 25 }) as any);
-        items = submissions.map((s: any) => ({
-          name: `r/${s.subreddit.display_name} — ${s.title}`,
-          identifier: `https://reddit.com${s.permalink}`,
-          description: `${s.score} points · ${s.num_comments} comments`,
         }));
         break;
       }
@@ -192,24 +173,6 @@ router.get('/:id/stats', async (req: Request, res: Response) => {
           { label: 'Total Forks', value: fmtNum(totalForks) },
           { label: 'Followers', value: fmtNum(user.followers) },
           { label: 'Public Repos', value: fmtNum(user.public_repos) },
-        ];
-        break;
-      }
-
-      case 'reddit': {
-        const creds = credentials as RedditCredentials;
-        const reddit = new Snoowrap({
-          userAgent: 'Rippl3FX/1.0',
-          clientId: creds.clientId,
-          clientSecret: creds.clientSecret,
-          username: creds.username,
-          password: creds.password,
-        });
-        const me = await (reddit.getMe() as any);
-        stats = [
-          { label: 'Post Karma', value: fmtNum(me.link_karma) },
-          { label: 'Comment Karma', value: fmtNum(me.comment_karma) },
-          { label: 'Account Age', value: `${Math.floor((Date.now() / 1000 - me.created_utc) / 86400 / 365)} yrs` },
         ];
         break;
       }

@@ -2,6 +2,8 @@ import db from '../db/connection';
 import { decryptCredentials } from '../crypto/credentials';
 import { getLocalDate } from '../utils/timezone';
 import { computeInterestScore } from '../lanes/score';
+import { writeMetrics } from '../lanes/unify';
+import { insertPollLog } from '../db/queries/logs';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 const LOOKBACK_DAYS = 14;
@@ -23,7 +25,6 @@ function getAccountCredentials(accountId: number): { credentials: any; platform:
 
 const LANE_CALC: Record<string, { reach: string[]; interest: string[]; engagement: string[] }> = {
   github: { reach: ['traffic_views', 'traffic_uniques'], interest: ['stars', 'forks'], engagement: ['clones', 'clones_uniques'] },
-  reddit: { reach: ['view_count'], interest: ['upvotes'], engagement: ['comment_count'] },
   ga4:    { reach: ['pageviews'], interest: ['users'], engagement: ['sessions'] },
   bing:   { reach: ['impressions'], interest: ['clicks'], engagement: [] },
 };
@@ -104,6 +105,11 @@ async function backfillGithub(trackedItemId: number, accountId: number, platform
     );
 
     recalcDailyScores(trackedItemId, 'github', date, columns);
+    writeMetrics(trackedItemId, 'github', 'daily', date, date, {
+      traffic_views: tv.views, traffic_uniques: tv.uniques,
+      stars: repoData.stargazers_count, forks: repoData.forks_count,
+      clones: tc.clones, clones_uniques: tc.uniques,
+    });
   }
 
   console.log(`[Backfill] GitHub: inserted ${dates.length} daily rows for ${platformIdentifier}`);
@@ -164,6 +170,7 @@ async function backfillGA4(trackedItemId: number, accountId: number, platformIde
     `).run(trackedItemId, sessions, pageviews, users, engagementRate, pageviews, sessions, date, date);
 
     recalcDailyScores(trackedItemId, 'ga4', date, columns);
+    writeMetrics(trackedItemId, 'ga4', 'daily', date, date, { pageviews, users, sessions, engagement_rate: engagementRate });
   }
 
   console.log(`[Backfill] GA4: inserted up to ${dates.length} daily rows for ${platformIdentifier}`);
@@ -202,6 +209,7 @@ async function backfillBing(trackedItemId: number, accountId: number, platformId
     `).run(trackedItemId, impressions, clicks, ctr, avgRank, impressions, clicks, date, date);
 
     recalcDailyScores(trackedItemId, 'bing', date, columns);
+    writeMetrics(trackedItemId, 'bing', 'daily', date, date, { impressions, clicks, ctr });
   }
 
   console.log(`[Backfill] Bing: inserted daily rows for ${platformIdentifier}`);
@@ -209,14 +217,16 @@ async function backfillBing(trackedItemId: number, accountId: number, platformId
 
 /** Run historical backfill for a newly tracked item. Fire-and-forget. */
 export async function runHistoricalBackfill(trackedItemId: number, accountId: number, platform: string, platformIdentifier: string): Promise<void> {
+  insertPollLog({ metric_account_id: accountId, tracked_item_id: trackedItemId, platform, level: 'info', message: `Backfill started for ${platformIdentifier} (${LOOKBACK_DAYS} days)` });
   try {
     switch (platform) {
       case 'github': await backfillGithub(trackedItemId, accountId, platformIdentifier); break;
       case 'ga4':    await backfillGA4(trackedItemId, accountId, platformIdentifier); break;
       case 'bing':   await backfillBing(trackedItemId, accountId, platformIdentifier); break;
-      // Reddit has no historical API
     }
+    insertPollLog({ metric_account_id: accountId, tracked_item_id: trackedItemId, platform, level: 'info', message: `Backfill completed for ${platformIdentifier}` });
   } catch (err: any) {
     console.error(`[Backfill] Failed for ${platform} item ${trackedItemId}: ${err.message}`);
+    insertPollLog({ metric_account_id: accountId, tracked_item_id: trackedItemId, platform, level: 'error', message: `Backfill failed for ${platformIdentifier}: ${err.message}` });
   }
 }

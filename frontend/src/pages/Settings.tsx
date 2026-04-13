@@ -20,7 +20,7 @@ const labelStyle: React.CSSProperties = {
   fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.8,
 };
 
-const PLATFORMS = ['Reddit', 'GitHub', 'GA4', 'Bing'];
+const PLATFORMS = ['GitHub', 'GA4', 'Bing'];
 
 interface Account {
   id: number;
@@ -33,12 +33,6 @@ interface Account {
 }
 
 const CREDENTIAL_FIELDS: Record<string, Array<{ key: string; label: string; type?: string }>> = {
-  reddit: [
-    { key: 'username', label: 'Reddit Username' },
-    { key: 'password', label: 'Reddit Password', type: 'password' },
-    { key: 'clientId', label: 'Client ID' },
-    { key: 'clientSecret', label: 'Client Secret', type: 'password' },
-  ],
   github: [
     { key: 'personalAccessToken', label: 'Personal Access Token', type: 'password' },
   ],
@@ -58,6 +52,7 @@ export default function Settings() {
   const tabs = [
     { k: 'profile', l: 'Profile' },
     { k: 'accounts', l: 'Platform Accounts' },
+    { k: 'items', l: 'Tracked Items' },
     { k: 'weights', l: 'Performance Weights' },
     { k: 'logs', l: 'Poll Logs' },
   ];
@@ -94,6 +89,7 @@ export default function Settings() {
             </>
           )}
           {tab === 'accounts' && <AccountsTab />}
+          {tab === 'items' && <TrackedItemsTab />}
           {tab === 'weights' && <WeightsTab />}
           {tab === 'logs' && <LogsTab />}
         </div>
@@ -320,8 +316,18 @@ function AccountsTab() {
 
   const connectedPlatforms = accounts.map(a => a.platform);
 
+  const handleDeactivate = async (id: number) => {
+    await apiPost(`/accounts/${id}/deactivate`);
+    loadAccounts();
+  };
+
+  const handleReactivate = async (id: number) => {
+    await apiPost(`/accounts/${id}/reactivate`);
+    loadAccounts();
+  };
+
   const handleDelete = async (id: number) => {
-    if (!confirm('Remove this account? All tracked items will be deleted.')) return;
+    if (!confirm('Permanently delete this account? All items and metric data will be purged. This cannot be undone.')) return;
     await apiDelete(`/accounts/${id}`);
     loadAccounts();
   };
@@ -335,15 +341,23 @@ function AccountsTab() {
         return (
           <div key={a.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
             <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ cursor: 'pointer' }} onClick={() => toggleExpand(a.id)}>
+              <div>
                 <PlatformPill platform={displayPlatform} />
                 <div style={{ fontSize: 10, color: C.textFaint, marginTop: 5, fontFamily: font }}>
-                  {a.display_name} · polls every {a.polling_interval_min} min {isExpanded ? '▲' : '▼'}
+                  {a.display_name} · polls every {a.polling_interval_min} min
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => toggleExpand(a.id)} style={{ padding: '4px 10px', background: C.accent + '15', border: `1px solid ${C.accent}55`, borderRadius: 5, color: C.accent, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: font }}>
+                  {isExpanded ? 'Hide Items' : 'Backfill Items'}
+                </button>
                 <button onClick={() => { setEditAccount(a); setShowModal(true); }} style={{ padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMid, fontSize: 11, cursor: 'pointer', fontFamily: font }}>Edit</button>
-                <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Remove</button>
+                {a.is_active ? (
+                  <button onClick={() => handleDeactivate(a.id)} style={{ padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textFaint, fontSize: 11, cursor: 'pointer', fontFamily: font }}>Deactivate</button>
+                ) : (
+                  <button onClick={() => handleReactivate(a.id)} style={{ padding: '4px 10px', background: C.up + '15', border: `1px solid ${C.up}55`, borderRadius: 5, color: C.up, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: font }}>Reactivate</button>
+                )}
+                <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Delete</button>
               </div>
             </div>
             {isExpanded && (
@@ -352,32 +366,28 @@ function AccountsTab() {
                   <div style={{ fontSize: 11, color: C.textFaint, fontFamily: font }}>No tracked items</div>
                 ) : (
                   <>
-                    {a.platform !== 'reddit' && (
-                      <div style={{ marginBottom: 10 }}>
-                        <button onClick={() => handleBackfillAll(a.id)} disabled={backfillingId !== null} style={{
-                          padding: '4px 12px', background: C.accent + '15',
-                          border: `1px solid ${C.accent}40`, borderRadius: 5,
-                          color: C.accent, fontSize: 10, fontWeight: 700,
-                          cursor: backfillingId !== null ? 'wait' : 'pointer', fontFamily: font,
-                          opacity: backfillingId !== null ? 0.6 : 1,
-                        }}>Backfill All (14 days)</button>
-                      </div>
-                    )}
+                    <div style={{ marginBottom: 10 }}>
+                      <button onClick={() => handleBackfillAll(a.id)} disabled={backfillingId !== null} style={{
+                        padding: '4px 12px', background: C.accent + '15',
+                        border: `1px solid ${C.accent}40`, borderRadius: 5,
+                        color: C.accent, fontSize: 10, fontWeight: 700,
+                        cursor: backfillingId !== null ? 'wait' : 'pointer', fontFamily: font,
+                        opacity: backfillingId !== null ? 0.6 : 1,
+                      }}>Backfill All (14 days)</button>
+                    </div>
                     {accountItems.map(item => (
                       <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: `1px solid ${C.border}22` }}>
                         <div>
                           <div style={{ fontSize: 12, color: C.text, fontFamily: font, fontWeight: 600 }}>{item.display_name}</div>
                           <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font }}>{item.platform_identifier}</div>
                         </div>
-                        {a.platform !== 'reddit' && (
-                          <button onClick={() => handleBackfill(item.id)} disabled={backfillingId === item.id} style={{
-                            padding: '3px 8px', background: 'none',
-                            border: `1px solid ${C.accent}55`, borderRadius: 4,
-                            color: C.accent, fontSize: 9,
-                            cursor: backfillingId === item.id ? 'wait' : 'pointer',
-                            fontFamily: font, opacity: backfillingId === item.id ? 0.6 : 1,
-                          }}>{backfillingId === item.id ? 'Backfilling...' : 'Backfill 14d'}</button>
-                        )}
+                        <button onClick={() => handleBackfill(item.id)} disabled={backfillingId === item.id} style={{
+                          padding: '3px 8px', background: 'none',
+                          border: `1px solid ${C.accent}55`, borderRadius: 4,
+                          color: C.accent, fontSize: 9,
+                          cursor: backfillingId === item.id ? 'wait' : 'pointer',
+                          fontFamily: font, opacity: backfillingId === item.id ? 0.6 : 1,
+                        }}>{backfillingId === item.id ? 'Backfilling...' : 'Backfill 14d'}</button>
                       </div>
                     ))}
                   </>
@@ -513,6 +523,151 @@ interface PollLog {
 }
 
 // ── Performance Weights Tab ──
+// ── Tracked Items Tab ──
+function TrackedItemsTab() {
+  const [items, setItems] = useState<Array<{ id: number; platform_identifier: string; display_name: string; is_active: number; platform: string; account_name: string }>>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [backfillingId, setBackfillingId] = useState<number | null>(null);
+  const [filter, setFilter] = useState<'all' | 'tracking' | 'untracked'>('all');
+
+  const loadItems = async () => {
+    try {
+      // Get all items with their account info
+      const allItems = await apiGet<Array<{ id: number; metric_account_id: number; platform_identifier: string; display_name: string; is_active: number }>>('/items');
+      const accounts = await apiGet<Account[]>('/accounts');
+      const accountMap: Record<number, Account> = {};
+      accounts.forEach(a => { accountMap[a.id] = a; });
+
+      setItems(allItems.map(item => ({
+        ...item,
+        platform: accountMap[item.metric_account_id]?.platform || 'unknown',
+        account_name: accountMap[item.metric_account_id]?.display_name || 'Unknown',
+      })));
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => { loadItems(); }, []);
+
+  const handleDelete = async (id: number) => {
+    await apiDelete(`/items/${id}`);
+    setConfirmDeleteId(null);
+    loadItems();
+  };
+
+  const handleUntrack = async (id: number) => {
+    await apiPost(`/items/${id}/untrack`);
+    loadItems();
+  };
+
+  const handleRetrack = async (id: number) => {
+    await apiPost(`/items/${id}/retrack`, {});
+    loadItems();
+  };
+
+  const handleBackfill = async (id: number) => {
+    setBackfillingId(id);
+    try { await apiPost(`/items/${id}/backfill`); } catch { /* ignore */ }
+    setTimeout(() => setBackfillingId(null), 3000);
+  };
+
+  const filtered = items.filter(i => {
+    if (filter === 'tracking') return i.is_active;
+    if (filter === 'untracked') return !i.is_active;
+    return true;
+  });
+
+  const capPlatform = (p: string) => p === 'ga4' ? 'GA4' : p.charAt(0).toUpperCase() + p.slice(1);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, fontFamily: font }}>All Tracked Items</div>
+        <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 6, padding: 2 }}>
+          {(['all', 'tracking', 'untracked'] as const).map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{
+              padding: '3px 10px', background: filter === f ? C.accent : 'transparent',
+              border: 'none', color: filter === f ? '#fff' : C.textMid,
+              fontSize: 9, fontWeight: filter === f ? 700 : 400,
+              borderRadius: 4, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
+            }}>{f}</button>
+          ))}
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div style={{ fontSize: 12, color: C.textFaint, fontFamily: font, padding: '20px 0', textAlign: 'center' }}>
+          No {filter !== 'all' ? filter : ''} items found.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {filtered.map(item => {
+            const platformColor = (C[capPlatform(item.platform) as keyof typeof C] || C.accent) as string;
+            return (
+              <div key={item.id} style={{
+                background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8,
+                padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                opacity: item.is_active ? 1 : 0.6,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: platformColor, fontFamily: font, textTransform: 'uppercase', letterSpacing: 1 }}>{capPlatform(item.platform)}</span>
+                    <span style={{ fontSize: 9, color: item.is_active ? C.up : C.textFaint, fontFamily: font }}>
+                      {item.is_active ? 'Tracking' : 'Untracked'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.text, fontWeight: 600, fontFamily: font }}>{item.display_name}</div>
+                  <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font }}>{item.platform_identifier} · {item.account_name}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <button onClick={() => handleBackfill(item.id)} disabled={backfillingId === item.id} style={{
+                    padding: '4px 10px', background: C.accent + '15', border: `1px solid ${C.accent}55`,
+                    borderRadius: 5, color: C.accent, fontSize: 10, cursor: backfillingId === item.id ? 'wait' : 'pointer',
+                    fontFamily: font, opacity: backfillingId === item.id ? 0.6 : 1,
+                  }}>{backfillingId === item.id ? 'Backfilling...' : 'Backfill 14d'}</button>
+                  {item.is_active ? (
+                    <button onClick={() => handleUntrack(item.id)} style={{
+                      padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`,
+                      borderRadius: 5, color: C.textMid, fontSize: 10, cursor: 'pointer', fontFamily: font,
+                    }}>Untrack</button>
+                  ) : (
+                    <button onClick={() => handleRetrack(item.id)} style={{
+                      padding: '4px 10px', background: C.up + '15', border: `1px solid ${C.up}55`,
+                      borderRadius: 5, color: C.up, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: font,
+                    }}>Re-track</button>
+                  )}
+                  {confirmDeleteId === item.id ? (
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <span style={{ fontSize: 9, color: '#c00', fontFamily: font }}>Permanently delete?</span>
+                      <button onClick={() => handleDelete(item.id)} style={{
+                        padding: '4px 8px', background: '#e8380d', border: 'none',
+                        borderRadius: 5, color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: font,
+                      }}>Yes</button>
+                      <button onClick={() => setConfirmDeleteId(null)} style={{
+                        padding: '4px 8px', background: 'none', border: `1px solid ${C.border}`,
+                        borderRadius: 5, color: C.textMid, fontSize: 10, cursor: 'pointer', fontFamily: font,
+                      }}>No</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDeleteId(item.id)} style={{
+                      padding: '4px 10px', background: 'none', border: '1px solid #e8380d55',
+                      borderRadius: 5, color: '#e8380d', fontSize: 10, cursor: 'pointer', fontFamily: font,
+                    }}>Delete</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ marginTop: 14, fontSize: 9, color: C.textFaint, fontFamily: font, lineHeight: 1.5 }}>
+        <strong style={{ color: C.textSoft }}>Untrack</strong> stops polling and clears tags but preserves all metric history.
+        <br /><strong style={{ color: '#e8380d' }}>Delete</strong> permanently removes the item and all its metric data. This cannot be undone.
+      </div>
+    </div>
+  );
+}
+
 function WeightsTab() {
   const [reach, setReach] = useState(20);
   const [interest, setInterest] = useState(30);

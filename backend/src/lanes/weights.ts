@@ -13,12 +13,6 @@ export const WEIGHTS: Record<string, Record<string, number>> = {
     clones:          0.10,
     clones_uniques:  0.10,
   },
-  reddit: {
-    upvotes:       0.30,
-    upvote_ratio:  0.10,
-    comment_count: 0.30,
-    view_count:    0.30,
-  },
   ga4: {
     sessions:        0.30,
     pageviews:       0.25,

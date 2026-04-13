@@ -1,110 +1,51 @@
 import { Router, Request, Response } from 'express';
-import db from '../db/connection';
-import {
-  getTrackedItemsWithPlatform,
-  getLatestSnapshot,
-  getLatestForRange,
-  getRangePair,
-  getInterestHistory,
-  getLaneHistory,
-  getTagsForItem,
-  getPreviousDailyPair,
-  type DashboardItem,
-} from '../db/queries/metrics';
+import { getTrackedItemsWithPlatform, getTagsForItem, getLatestSnapshot } from '../db/queries/metrics';
+import { getTrackedPair, getTrackedHistory } from '../db/queries/tracked';
+import { getUnifiedPair } from '../db/queries/unified';
 import { getPerformanceWeights } from './performance';
 
 const router = Router();
-
-const LANE_METRICS: Record<string, { reach: string[]; interest: string[]; engagement: string[] }> = {
-  github: {
-    reach: ['traffic_views', 'traffic_uniques'],
-    interest: ['stars', 'forks'],
-    engagement: ['clones', 'clones_uniques'],
-  },
-  reddit: {
-    reach: ['view_count'],
-    interest: ['upvotes'],
-    engagement: ['comment_count'],
-  },
-  ga4: {
-    reach: ['pageviews'],
-    interest: ['users'],
-    engagement: ['sessions'],
-  },
-  bing: {
-    reach: ['impressions'],
-    interest: ['clicks'],
-    engagement: [],
-  },
-};
-
-function computeVelocity(
-  platform: string,
-  today: Record<string, any> | null,
-  yesterday: Record<string, any> | null
-): { reach: number; interest: number; engagement: number } {
-  if (!today || !yesterday) return { reach: 0, interest: 0, engagement: 0 };
-  const lm = LANE_METRICS[platform];
-  if (!lm) return { reach: 0, interest: 0, engagement: 0 };
-
-  const sum = (row: Record<string, any>, keys: string[]) =>
-    keys.reduce((s, k) => s + (row[k] ?? 0), 0);
-
-  return {
-    reach: sum(today, lm.reach) - sum(yesterday, lm.reach),
-    interest: sum(today, lm.interest) - sum(yesterday, lm.interest),
-    engagement: sum(today, lm.engagement) - sum(yesterday, lm.engagement),
-  };
-}
 
 // GET /api/dashboard?tag=NORA&range=daily
 router.get('/dashboard', (req: Request, res: Response) => {
   const tagFilter = req.query.tag as string | undefined;
   const range = (req.query.range as string) || 'daily';
   const trackedItems = getTrackedItemsWithPlatform(tagFilter);
-
   const weights = getPerformanceWeights();
 
-  const items: DashboardItem[] = trackedItems.map(ti => {
-    // Use range-aware data: hourly uses snapshots, daily/weekly/monthly use rollup tables
-    const latestSnapshot = range === 'hourly'
-      ? getLatestSnapshot(ti.id, ti.platform)
-      : getLatestForRange(ti.id, ti.platform, range);
-    const interestHistory = getInterestHistory(ti.id, ti.platform, 7, range);
-    const currentInterestScore = interestHistory[interestHistory.length - 1] ?? 0;
+  const items = trackedItems.map(ti => {
+    // Get current + previous from tracked_metrics for this range
+    const { current, previous } = getTrackedPair(ti.id, range);
 
-    // Trend: compare last 2 periods
-    const today = interestHistory[interestHistory.length - 1] ?? 0;
-    const yesterday = interestHistory[interestHistory.length - 2] ?? 0;
-    let interestTrend: 'up' | 'down' | 'flat' = 'flat';
-    if (today > yesterday) interestTrend = 'up';
-    else if (today < yesterday) interestTrend = 'down';
+    // Lane values from tracked_metrics (same numbers shown in UI)
+    const reach = current?.reach_value ?? 0;
+    const interest = current?.interest_value ?? 0;
+    const engagement = current?.engagement_value ?? 0;
+    const performanceScore = current?.performance_score ?? 0;
 
-    // Compute per-lane velocity from the selected range
-    const { today: rangeToday, yesterday: rangeYesterday } = getRangePair(ti.id, ti.platform, range === 'hourly' ? 'daily' : range);
-    const velocity = computeVelocity(ti.platform, rangeToday, rangeYesterday);
-
-    // Compute performance score using weights + normalized lane scores
-    let performanceScore = 0;
-    let prevPerformanceScore = 0;
-
-    const dailyTable = `${ti.platform}_daily`;
-    const peakReach = (db.prepare(`SELECT MAX(reach_score) as peak FROM ${dailyTable} WHERE tracked_item_id = ?`).get(ti.id) as any)?.peak || 1;
-    const peakEngagement = (db.prepare(`SELECT MAX(engagement_score) as peak FROM ${dailyTable} WHERE tracked_item_id = ?`).get(ti.id) as any)?.peak || 1;
-
-    const normScore = (row: Record<string, any> | null) => {
-      if (!row) return 0;
-      const r = Math.min(100, ((row.reach_score ?? 0) / peakReach) * 100);
-      const i = row.interest_score ?? 0; // already 0-100
-      const e = Math.min(100, ((row.engagement_score ?? 0) / peakEngagement) * 100);
-      return r * weights.reach + i * weights.interest + e * weights.engagement;
+    // Velocity = current - previous
+    const velocity = {
+      reach: reach - (previous?.reach_value ?? 0),
+      interest: interest - (previous?.interest_value ?? 0),
+      engagement: engagement - (previous?.engagement_value ?? 0),
     };
+    const performanceVelocity = performanceScore - (previous?.performance_score ?? 0);
 
-    performanceScore = normScore(rangeToday);
-    prevPerformanceScore = normScore(rangeYesterday);
+    // History arrays for charts (last 7 periods)
+    const history = getTrackedHistory(ti.id, range, 7).reverse();
+    const reachHistory = history.map(r => r.reach_value ?? 0);
+    const interestHistory = history.map(r => r.interest_value ?? 0);
+    const engagementHistory = history.map(r => r.engagement_value ?? 0);
+    const performanceHistory = history.map(r => r.performance_score ?? 0);
 
-    const reachHistory = getLaneHistory(ti.id, ti.platform, 'reach', 7, range);
-    const engagementHistory = getLaneHistory(ti.id, ti.platform, 'engagement', 7, range);
+    // Pad to 7 if less
+    while (reachHistory.length < 7) reachHistory.unshift(0);
+    while (interestHistory.length < 7) interestHistory.unshift(0);
+    while (engagementHistory.length < 7) engagementHistory.unshift(0);
+    while (performanceHistory.length < 7) performanceHistory.unshift(0);
+
+    // Still provide latestSnapshot for platform-specific detail views
+    const latestSnapshot = getLatestSnapshot(ti.id, ti.platform);
 
     return {
       id: ti.id,
@@ -113,18 +54,103 @@ router.get('/dashboard', (req: Request, res: Response) => {
       platform_identifier: ti.platform_identifier,
       tags: getTagsForItem(ti.id),
       latestSnapshot,
+      // Lane values (raw, same as UI cards)
+      reach,
+      interest,
+      engagement,
+      performanceScore: Math.round(performanceScore * 100) / 100,
+      // Velocity
+      velocity,
+      performanceVelocity: Math.round(performanceVelocity * 100) / 100,
+      // History for charts
       reachHistory,
       interestHistory,
       engagementHistory,
-      currentInterestScore,
-      interestTrend,
-      velocity,
-      performanceScore: Math.round(performanceScore * 100) / 100,
-      performanceVelocity: Math.round((performanceScore - prevPerformanceScore) * 100) / 100,
+      performanceHistory,
     };
   });
 
-  res.json({ items, weights });
+  // Platform-level data: from unified_metrics when no tag filter, from items when tag-filtered
+  const platforms: Record<string, any> = {};
+  if (tagFilter) {
+    // Tag-filtered: compute platform totals from filtered items
+    for (const item of items) {
+      const p = item.platform;
+      if (!platforms[p]) {
+        platforms[p] = { reach: 0, interest: 0, engagement: 0, performanceScore: 0, velocity: { reach: 0, interest: 0, engagement: 0 }, performanceVelocity: 0 };
+      }
+      platforms[p].reach += item.reach;
+      platforms[p].interest += item.interest;
+      platforms[p].engagement += item.engagement;
+      platforms[p].performanceScore += item.performanceScore;
+      platforms[p].velocity.reach += item.velocity.reach;
+      platforms[p].velocity.interest += item.velocity.interest;
+      platforms[p].velocity.engagement += item.velocity.engagement;
+      platforms[p].performanceVelocity += item.performanceVelocity;
+    }
+  } else if (range === 'hourly') {
+    // Hourly: compute from items (unified_metrics not populated for hourly)
+    for (const item of items) {
+      const p = item.platform;
+      if (!platforms[p]) {
+        platforms[p] = { reach: 0, interest: 0, engagement: 0, performanceScore: 0, velocity: { reach: 0, interest: 0, engagement: 0 }, performanceVelocity: 0 };
+      }
+      platforms[p].reach += item.reach;
+      platforms[p].interest += item.interest;
+      platforms[p].engagement += item.engagement;
+      platforms[p].performanceScore += item.performanceScore;
+      platforms[p].velocity.reach += item.velocity.reach;
+      platforms[p].velocity.interest += item.velocity.interest;
+      platforms[p].velocity.engagement += item.velocity.engagement;
+      platforms[p].performanceVelocity += item.performanceVelocity;
+    }
+  } else {
+    // Daily/weekly/monthly: use unified_metrics (platform-wide totals)
+    for (const p of ['github', 'ga4', 'bing']) {
+      const { current, previous } = getUnifiedPair(p, range);
+      if (current) {
+        platforms[p] = {
+          reach: current.reach_value ?? 0,
+          interest: current.interest_value ?? 0,
+          engagement: current.engagement_value ?? 0,
+          performanceScore: Math.round((current.performance_score ?? 0) * 100) / 100,
+          velocity: {
+            reach: (current.reach_value ?? 0) - (previous?.reach_value ?? 0),
+            interest: (current.interest_value ?? 0) - (previous?.interest_value ?? 0),
+            engagement: (current.engagement_value ?? 0) - (previous?.engagement_value ?? 0),
+          },
+          performanceVelocity: Math.round(((current.performance_score ?? 0) - (previous?.performance_score ?? 0)) * 100) / 100,
+        };
+      }
+    }
+  }
+
+  // Totals across all platforms (for lane cards)
+  const totals = {
+    reach: Object.values(platforms).reduce((s: number, p: any) => s + (p?.reach ?? 0), 0),
+    interest: Object.values(platforms).reduce((s: number, p: any) => s + (p?.interest ?? 0), 0),
+    engagement: Object.values(platforms).reduce((s: number, p: any) => s + (p?.engagement ?? 0), 0),
+    performanceScore: Object.values(platforms).reduce((s: number, p: any) => s + (p?.performanceScore ?? 0), 0),
+    velocity: {
+      reach: Object.values(platforms).reduce((s: number, p: any) => s + (p?.velocity?.reach ?? 0), 0),
+      interest: Object.values(platforms).reduce((s: number, p: any) => s + (p?.velocity?.interest ?? 0), 0),
+      engagement: Object.values(platforms).reduce((s: number, p: any) => s + (p?.velocity?.engagement ?? 0), 0),
+    },
+    performanceVelocity: Object.values(platforms).reduce((s: number, p: any) => s + (p?.performanceVelocity ?? 0), 0),
+  };
+
+  // Distribution % per lane (platform's share of total)
+  const distribution: Record<string, { reach: number; interest: number; engagement: number }> = {};
+  for (const [p, data] of Object.entries(platforms)) {
+    if (!data) continue;
+    distribution[p] = {
+      reach: totals.reach > 0 ? Math.round((data.reach / totals.reach) * 10000) / 100 : 0,
+      interest: totals.interest > 0 ? Math.round((data.interest / totals.interest) * 10000) / 100 : 0,
+      engagement: totals.engagement > 0 ? Math.round((data.engagement / totals.engagement) * 10000) / 100 : 0,
+    };
+  }
+
+  res.json({ items, platforms, totals, distribution, weights });
 });
 
 export default router;

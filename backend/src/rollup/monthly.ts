@@ -1,8 +1,9 @@
 import db from '../db/connection';
 import {
-  insertGithubMonthly, insertRedditMonthly, insertGA4Monthly, insertBingMonthly,
+  insertGithubMonthly, insertGA4Monthly, insertBingMonthly,
 } from '../db/queries/rollup';
 import { getLocalYearMonth } from '../utils/timezone';
+import { writeTrackedMetric, refreshUnifiedMetric } from '../lanes/unify';
 
 function getLastDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -41,17 +42,16 @@ export function runMonthlyRollup(year?: number, month?: number): void {
   let count = 0;
 
   const MONTHLY_TABLES: Record<string, string> = {
-    github: 'github_monthly', reddit: 'reddit_monthly', ga4: 'ga4_monthly', bing: 'bing_monthly',
+    github: 'github_monthly', ga4: 'ga4_monthly', bing: 'bing_monthly',
   };
   const DAILY_TABLES: Record<string, string> = {
-    github: 'github_daily', reddit: 'reddit_daily', ga4: 'ga4_daily', bing: 'bing_daily',
+    github: 'github_daily', ga4: 'ga4_daily', bing: 'bing_daily',
   };
 
   for (const item of items) {
     try {
       switch (item.platform) {
         case 'github':  insertGithubMonthly(item.id, periodStart, periodEnd); break;
-        case 'reddit':  insertRedditMonthly(item.id, periodStart, periodEnd); break;
         case 'ga4':     insertGA4Monthly(item.id, periodStart, periodEnd); break;
         case 'bing':    insertBingMonthly(item.id, periodStart, periodEnd); break;
       }
@@ -70,10 +70,22 @@ export function runMonthlyRollup(year?: number, month?: number): void {
         }
       }
 
+      // Write monthly tracked_metrics from daily sums
+      const dailySums = db.prepare(`
+        SELECT COALESCE(SUM(reach_value), 0) as reach, COALESCE(SUM(interest_value), 0) as interest, COALESCE(SUM(engagement_value), 0) as engagement
+        FROM tracked_metrics WHERE tracked_item_id = ? AND period_type = 'daily' AND period_start BETWEEN ? AND ?
+      `).get(item.id, periodStart, periodEnd) as { reach: number; interest: number; engagement: number };
+      writeTrackedMetric(item.id, item.platform, 'monthly', periodStart, periodEnd, dailySums);
+
       count++;
     } catch (err: any) {
       console.error(`[Rollup] Failed monthly rollup for item ${item.id} (${item.platform}): ${err.message}`);
     }
+  }
+
+  // Refresh unified_metrics for all platforms
+  for (const platform of Object.keys(MONTHLY_TABLES)) {
+    refreshUnifiedMetric(platform, 'monthly', periodStart, periodEnd);
   }
 
   console.log(`[Rollup] Monthly rollup complete — processed ${count} items`);

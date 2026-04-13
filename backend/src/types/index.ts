@@ -1,6 +1,6 @@
 export interface MetricAccount {
   id: number;
-  platform: 'reddit' | 'github' | 'ga4' | 'bing';
+  platform: 'github' | 'ga4' | 'bing';
   display_name: string;
   credentials: string; // AES-256 encrypted JSON blob
   polling_interval_min: number;
@@ -22,13 +22,6 @@ export interface TrackedItem {
 
 export interface GithubCredentials {
   personalAccessToken: string;
-}
-
-export interface RedditCredentials {
-  username: string;
-  password: string;
-  clientId: string;
-  clientSecret: string;
 }
 
 export interface GA4Credentials {

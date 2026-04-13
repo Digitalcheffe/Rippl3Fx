@@ -14,7 +14,6 @@ export const C = {
   borderMid:   '#a8c4e0',
   accent:      '#e8622a',
   accentSoft:  '#e8622a18',
-  Reddit:      '#e8380d',
   GitHub:      '#0969da',
   GA4:         '#e6a817',
   Bing:        '#00897b',

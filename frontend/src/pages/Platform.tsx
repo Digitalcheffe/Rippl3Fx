@@ -10,11 +10,12 @@ import LaneSummary from '../components/LaneSummary';
 import PerformanceTrend from '../components/PerformanceTrend';
 import LayeredInterestChart from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
+import { LaneInfoButton, LaneInfoPanel } from '../components/LaneInfo';
 
 const font = "'DM Mono', monospace";
 
 const PLATFORM_NAMES: Record<string, string> = {
-  reddit: 'Reddit', github: 'GitHub', ga4: 'GA4', bing: 'Bing',
+  github: 'GitHub', ga4: 'GA4', bing: 'Bing',
 };
 
 interface Account {
@@ -38,18 +39,14 @@ interface Tag {
   name: string;
 }
 
-function mapItemToLanes(item: any, plat: string): Record<string, { current: number; history: number[]; velocity: number }> {
-  const snap = item.latestSnapshot;
-  const hist = item.interestHistory || [0,0,0,0,0,0,0];
+/** Map a dashboard API item (with reach/interest/engagement directly) to StatCard lanes. */
+function itemToLanes(item: any): Record<string, { current: number; history: number[]; velocity: number }> {
   const v = item.velocity || { reach: 0, interest: 0, engagement: 0 };
-  if (!snap) return { Reach: { current: 0, history: hist, velocity: 0 }, Interest: { current: 0, history: hist, velocity: 0 }, Engagement: { current: 0, history: hist, velocity: 0 } };
-  switch (plat) {
-    case 'github': return { Reach: { current: (snap.traffic_views||0)+(snap.traffic_uniques||0), history: hist, velocity: v.reach }, Interest: { current: (snap.stars||0)+(snap.forks||0), history: hist, velocity: v.interest }, Engagement: { current: (snap.clones||0)+(snap.clones_uniques||0), history: hist, velocity: v.engagement } };
-    case 'reddit': return { Reach: { current: snap.view_count||0, history: hist, velocity: v.reach }, Interest: { current: snap.upvotes||0, history: hist, velocity: v.interest }, Engagement: { current: snap.comment_count||0, history: hist, velocity: v.engagement } };
-    case 'ga4': return { Reach: { current: snap.pageviews||0, history: hist, velocity: v.reach }, Interest: { current: snap.users||0, history: hist, velocity: v.interest }, Engagement: { current: snap.sessions||0, history: hist, velocity: v.engagement } };
-    case 'bing': return { Reach: { current: snap.impressions||0, history: hist, velocity: v.reach }, Interest: { current: snap.clicks||0, history: hist, velocity: v.interest }, Engagement: { current: snap.ctr?Math.round(snap.ctr*1000)/10:0, history: hist, velocity: v.engagement } };
-    default: return { Reach: { current: 0, history: hist, velocity: 0 }, Interest: { current: 0, history: hist, velocity: 0 }, Engagement: { current: 0, history: hist, velocity: 0 } };
-  }
+  return {
+    Reach: { current: item.reach ?? 0, history: item.reachHistory || [0,0,0,0,0,0,0], velocity: v.reach },
+    Interest: { current: item.interest ?? 0, history: item.interestHistory || [0,0,0,0,0,0,0], velocity: v.interest },
+    Engagement: { current: item.engagement ?? 0, history: item.engagementHistory || [0,0,0,0,0,0,0], velocity: v.engagement },
+  };
 }
 
 const inp: React.CSSProperties = {
@@ -70,11 +67,11 @@ export default function Platform() {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<TrackedItem | null>(null);
-  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [dashboardItems, setDashboardItems] = useState<any[]>([]);
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [activeChart, setActiveChart] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   // Load accounts for this platform
   useEffect(() => {
@@ -107,36 +104,32 @@ export default function Platform() {
     });
   }, [items]);
 
+  // Load dashboard data for platform-level metrics
+  const [platformData, setPlatformData] = useState<any>(null);
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('range', timeRange);
+    apiGet<{ items: any[]; platforms: Record<string, any> }>(`/dashboard?${params}`)
+      .then(data => {
+        setDashboardItems(data.items.filter(i => i.platform === platform));
+        setPlatformData(data.platforms?.[platform || ''] || null);
+      })
+      .catch(() => {});
+  }, [platform, items, timeRange]);
+
   // Load all tags for add-item tag select
   useEffect(() => {
     apiGet<Tag[]>('/tags').then(setAllTags).catch(() => {});
   }, []);
 
-  // Load dashboard data for platform-level metrics
-  useEffect(() => {
-    const params = new URLSearchParams();
-    params.set('range', timeRange);
-    apiGet<{ items: any[] }>(`/dashboard?${params}`)
-      .then(data => {
-        const filtered = data.items.filter(i => i.platform === platform);
-        setDashboardItems(filtered);
-      })
-      .catch(() => {});
-  }, [platform, items, timeRange]);
-
-  // Map dashboard items to lane data for LaneSummary
-  const laneSummaryItems = dashboardItems.map(item => {
-    const snap = item.latestSnapshot;
-    const v = item.velocity || { reach: 0, interest: 0, engagement: 0 };
-    if (!snap) return { lanes: { Reach: { current: 0, velocity: 0 }, Interest: { current: 0, velocity: 0 }, Engagement: { current: 0, velocity: 0 } } };
-    switch (platform) {
-      case 'github': return { lanes: { Reach: { current: (snap.traffic_views || 0) + (snap.traffic_uniques || 0), velocity: v.reach }, Interest: { current: (snap.stars || 0) + (snap.forks || 0), velocity: v.interest }, Engagement: { current: (snap.clones || 0) + (snap.clones_uniques || 0), velocity: v.engagement } } };
-      case 'reddit': return { lanes: { Reach: { current: snap.view_count || 0, velocity: v.reach }, Interest: { current: snap.upvotes || 0, velocity: v.interest }, Engagement: { current: snap.comment_count || 0, velocity: v.engagement } } };
-      case 'ga4': return { lanes: { Reach: { current: snap.pageviews || 0, velocity: v.reach }, Interest: { current: snap.users || 0, velocity: v.interest }, Engagement: { current: snap.sessions || 0, velocity: v.engagement } } };
-      case 'bing': return { lanes: { Reach: { current: snap.impressions || 0, velocity: v.reach }, Interest: { current: snap.clicks || 0, velocity: v.interest }, Engagement: { current: snap.ctr ? Math.round(snap.ctr * 1000) / 10 : 0, velocity: v.engagement } } };
-      default: return { lanes: { Reach: { current: 0, velocity: 0 }, Interest: { current: 0, velocity: 0 }, Engagement: { current: 0, velocity: 0 } } };
-    }
-  });
+  // Lane summary from platform-level unified_metrics
+  const laneSummaryItems = platformData ? [{
+    lanes: {
+      Reach: { current: platformData.reach ?? 0, velocity: platformData.velocity?.reach ?? 0 },
+      Interest: { current: platformData.interest ?? 0, velocity: platformData.velocity?.interest ?? 0 },
+      Engagement: { current: platformData.engagement ?? 0, velocity: platformData.velocity?.engagement ?? 0 },
+    },
+  }] : [];
 
   const [polling, setPolling] = useState(false);
   const [pollResult, setPollResult] = useState<string | null>(null);
@@ -162,16 +155,17 @@ export default function Platform() {
     }
   };
 
-  const handleToggleActive = async (item: TrackedItem) => {
-    await apiPut(`/items/${item.id}`, { is_active: item.is_active ? 0 : 1 });
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_active: i.is_active ? 0 : 1 } : i));
+  const handleUntrack = async (id: number) => {
+    await apiPost(`/items/${id}/untrack`);
+    if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
   };
 
-  const handleRemoveItem = async (id: number) => {
-    await apiDelete(`/items/${id}`);
-    setItems(prev => prev.filter(i => i.id !== id));
-    setConfirmRemoveId(null);
+  const handleRetrack = async (id: number) => {
+    await apiPost(`/items/${id}/retrack`, {});
+    if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
   };
+
+  const [showUntracked, setShowUntracked] = useState(false);
 
   // Tag removal handled via tag management UI
   void itemTags; // used in StatCard rendering
@@ -185,17 +179,22 @@ export default function Platform() {
           <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>{name}</h1>
         </div>
-        <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 8, padding: 2 }}>
-          {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
-            <button key={range} onClick={() => setTimeRange(range)} style={{
-              padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
-              border: 'none', color: timeRange === range ? '#fff' : C.textMid,
-              fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
-              borderRadius: 6, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
-            }}>{range}</button>
-          ))}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 8, padding: 2 }}>
+            {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
+              <button key={range} onClick={() => setTimeRange(range)} style={{
+                padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
+                border: 'none', color: timeRange === range ? '#fff' : C.textMid,
+                fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
+                borderRadius: 6, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
+              }}>{range}</button>
+            ))}
+          </div>
+          <LaneInfoButton onClick={() => setShowInfo(!showInfo)} />
         </div>
       </div>
+
+      {showInfo && <LaneInfoPanel platform={name} onClose={() => setShowInfo(false)} />}
 
       {accounts.length === 0 ? (
         <EmptyState platform={name} />
@@ -226,10 +225,12 @@ export default function Platform() {
             <>
               <LaneSummary
                 items={laneSummaryItems}
-                performanceScore={dashboardItems.length > 0 ? dashboardItems.reduce((s: number, i: any) => s + (i.performanceScore || 0), 0) / dashboardItems.length : undefined}
-                performanceVelocity={dashboardItems.length > 0 ? dashboardItems.reduce((s: number, i: any) => s + (i.performanceVelocity || 0), 0) / dashboardItems.length : undefined}
+                performanceScore={platformData?.performanceScore}
+                performanceVelocity={platformData?.performanceVelocity}
                 activeCard={activeChart}
                 onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
+                timeLabel={{ hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[timeRange]}
+                platform={platform}
               />
               <div style={{
                 maxHeight: activeChart ? 400 : 0,
@@ -304,87 +305,108 @@ export default function Platform() {
             />
           )}
 
-          {/* Items list */}
-          {items.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: C.textSoft, fontSize: 13, fontFamily: font }}>
-              No tracked items yet. Click "+ Add Item" to start tracking.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
-              {items.map((item, i) => {
-                // Find matching dashboard item for this tracked item
-                const dashItem = dashboardItems.find(d => d.id === item.id);
-                const statItem: StatCardItem = dashItem ? {
-                  id: item.id,
-                  platform: name,
-                  display_name: item.display_name,
-                  tags: (itemTags[item.id] || []).map(t => t.name),
-                  lanes: mapItemToLanes(dashItem, platform || ''),
-                } : {
-                  id: item.id,
-                  platform: name,
-                  display_name: item.display_name,
-                  tags: (itemTags[item.id] || []).map(t => t.name),
-                  lanes: {
-                    Reach: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
-                    Interest: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
-                    Engagement: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
-                  },
-                };
+          {/* Tracked items */}
+          {(() => {
+            const trackedItems = items.filter(i => i.is_active);
+            const untrackedItems = items.filter(i => !i.is_active);
 
-                return (
-                  <div key={item.id} style={{ opacity: item.is_active ? 1 : 0.5 }}>
-                    {editingItem?.id === item.id ? (
-                      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px' }}>
-                        <EditItemForm
-                          item={item}
-                          onSaved={() => {
-                            setEditingItem(null);
-                            if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
-                          }}
-                          onCancel={() => setEditingItem(null)}
-                        />
+            const renderItem = (item: TrackedItem, i: number, isTracked: boolean) => {
+              const dashItem = dashboardItems.find(d => d.id === item.id);
+              const statItem: StatCardItem = {
+                id: item.id,
+                platform: name,
+                display_name: item.display_name,
+                tags: (itemTags[item.id] || []).map(t => t.name),
+                lanes: dashItem ? itemToLanes(dashItem) : {
+                  Reach: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
+                  Interest: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
+                  Engagement: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
+                },
+                performanceScore: dashItem?.performanceScore,
+              };
+
+              return (
+                <div key={item.id} style={{ opacity: isTracked ? 1 : 0.5 }}>
+                  {editingItem?.id === item.id ? (
+                    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px' }}>
+                      <EditItemForm
+                        item={item}
+                        allTags={allTags}
+                        currentTagIds={(itemTags[item.id] || []).map(t => t.id)}
+                        onSaved={() => {
+                          setEditingItem(null);
+                          if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
+                          Promise.all(items.map(async it => {
+                            const tags = await apiGet<Tag[]>(`/tags/items/${it.id}/tags`).catch(() => []);
+                            return { id: it.id, tags };
+                          })).then(results => {
+                            const map: Record<number, Tag[]> = {};
+                            results.forEach(r => { map[r.id] = r.tags; });
+                            setItemTags(map);
+                          });
+                          apiGet<Tag[]>('/tags').then(setAllTags).catch(() => {});
+                        }}
+                        onCancel={() => setEditingItem(null)}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <StatCard item={statItem} index={i} />
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                        <button onClick={() => setEditingItem(item)} style={{
+                          padding: '3px 8px', background: 'none', border: `1px solid ${C.border}`,
+                          borderRadius: 4, color: C.textMid, fontSize: 9, cursor: 'pointer', fontFamily: font,
+                        }}>Edit</button>
+                        {isTracked ? (
+                          <button onClick={() => handleUntrack(item.id)} style={{
+                            padding: '3px 8px', background: 'none', border: `1px solid ${C.down}55`,
+                            borderRadius: 4, color: C.down, fontSize: 9, cursor: 'pointer', fontFamily: font,
+                          }}>Untrack</button>
+                        ) : (
+                          <button onClick={() => handleRetrack(item.id)} style={{
+                            padding: '3px 8px', background: C.up + '15', border: `1px solid ${C.up}55`,
+                            borderRadius: 4, color: C.up, fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: font,
+                          }}>Re-track</button>
+                        )}
                       </div>
-                    ) : (
-                      <>
-                        <StatCard item={statItem} index={i} />
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
-                          <button onClick={() => setEditingItem(item)} style={{
-                            padding: '3px 8px', background: 'none', border: `1px solid ${C.border}`,
-                            borderRadius: 4, color: C.textMid, fontSize: 9, cursor: 'pointer', fontFamily: font,
-                          }}>Edit</button>
-                          <button onClick={() => handleToggleActive(item)} style={{
-                            padding: '3px 8px', background: 'none',
-                            border: `1px solid ${item.is_active ? C.up + '55' : C.border}`,
-                            borderRadius: 4, color: item.is_active ? C.up : C.textFaint,
-                            fontSize: 9, cursor: 'pointer', fontFamily: font,
-                          }}>{item.is_active ? 'Active' : 'Paused'}</button>
-                          {confirmRemoveId === item.id ? (
-                            <>
-                              <span style={{ fontSize: 9, color: '#c00', fontFamily: font }}>Sure?</span>
-                              <button onClick={() => handleRemoveItem(item.id)} style={{
-                                padding: '3px 8px', background: '#e8380d', border: 'none',
-                                borderRadius: 4, color: '#fff', fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: font,
-                              }}>Yes</button>
-                              <button onClick={() => setConfirmRemoveId(null)} style={{
-                                padding: '3px 8px', background: 'none', border: `1px solid ${C.border}`,
-                                borderRadius: 4, color: C.textMid, fontSize: 9, cursor: 'pointer', fontFamily: font,
-                              }}>No</button>
-                            </>
-                          ) : (
-                            <button onClick={() => setConfirmRemoveId(item.id)} style={{
-                              padding: '3px 8px', background: 'none', border: '1px solid #e8380d55',
-                              borderRadius: 4, color: '#e8380d', fontSize: 9, cursor: 'pointer', fontFamily: font,
-                            }}>Remove</button>
-                          )}
-                        </div>
-                      </>
-                    )}
+                    </>
+                  )}
+                </div>
+              );
+            };
+
+            return (
+              <>
+                {trackedItems.length === 0 && untrackedItems.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: C.textSoft, fontSize: 13, fontFamily: font }}>
+                    No tracked items yet. Click "+ Add Item" to start tracking.
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
+                      {trackedItems.map((item, i) => renderItem(item, i, true))}
+                    </div>
+
+                    {untrackedItems.length > 0 && (
+                      <div style={{ marginTop: 20 }}>
+                        <button onClick={() => setShowUntracked(!showUntracked)} style={{
+                          background: 'none', border: 'none', color: C.textFaint, fontSize: 10,
+                          fontFamily: font, cursor: 'pointer', letterSpacing: 2, textTransform: 'uppercase',
+                        }}>
+                          Untracked ({untrackedItems.length}) {showUntracked ? '▲' : '▼'}
+                        </button>
+                        {showUntracked && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14, marginTop: 10 }}>
+                            {untrackedItems.map((item, i) => renderItem(item, i, false))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -392,9 +414,13 @@ export default function Platform() {
 }
 
 // ── Edit Item Form ──
-function EditItemForm({ item, onSaved, onCancel }: { item: TrackedItem; onSaved: () => void; onCancel: () => void }) {
+function EditItemForm({ item, allTags, currentTagIds, onSaved, onCancel }: {
+  item: TrackedItem; allTags: Tag[]; currentTagIds: number[]; onSaved: () => void; onCancel: () => void;
+}) {
   const [identifier, setIdentifier] = useState(item.platform_identifier);
   const [displayName, setDisplayName] = useState(item.display_name);
+  const [selectedTags, setSelectedTags] = useState<number[]>(currentTagIds);
+  const [newTagName, setNewTagName] = useState('');
   const [error, setError] = useState('');
 
   const handleSave = async () => {
@@ -406,10 +432,37 @@ function EditItemForm({ item, onSaved, onCancel }: { item: TrackedItem; onSaved:
         platform_identifier: identifier.trim(),
         display_name: displayName.trim(),
       });
+
+      // Sync tags: get current, remove removed, add added
+      const currentTags = await apiGet<Tag[]>(`/tags/items/${item.id}/tags`).catch(() => []);
+      const currentIds = currentTags.map(t => t.id);
+
+      // Remove tags no longer selected
+      for (const tagId of currentIds) {
+        if (!selectedTags.includes(tagId)) {
+          await apiDelete(`/tags/items/${item.id}/tags/${tagId}`).catch(() => {});
+        }
+      }
+      // Add newly selected tags
+      for (const tagId of selectedTags) {
+        if (!currentIds.includes(tagId)) {
+          await apiPost(`/tags/items/${item.id}/tags`, { tag_id: tagId }).catch(() => {});
+        }
+      }
+
       onSaved();
     } catch (err: any) {
       setError(err.message);
     }
+  };
+
+  const handleAddTag = async () => {
+    if (!newTagName.trim()) return;
+    try {
+      const tag = await apiPost<Tag>('/tags', { name: newTagName.trim() });
+      setSelectedTags(prev => [...prev, tag.id]);
+      setNewTagName('');
+    } catch { /* tag might already exist */ }
   };
 
   return (
@@ -424,6 +477,34 @@ function EditItemForm({ item, onSaved, onCancel }: { item: TrackedItem; onSaved:
           <input value={displayName} onChange={e => setDisplayName(e.target.value)} style={inp} />
         </div>
       </div>
+
+      {/* Tag management */}
+      <div>
+        <label style={{ fontSize: 10, color: C.textSoft, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Tags</label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+          {allTags.map(tag => {
+            const selected = selectedTags.includes(tag.id);
+            return (
+              <button key={tag.id} onClick={() => {
+                setSelectedTags(prev => selected ? prev.filter(id => id !== tag.id) : [...prev, tag.id]);
+              }} style={{
+                padding: '3px 10px', borderRadius: 5, fontSize: 10, fontFamily: font, cursor: 'pointer',
+                background: selected ? C.accent + '18' : 'transparent',
+                border: `1px solid ${selected ? C.accent : C.border}`,
+                color: selected ? C.accent : C.textMid, fontWeight: selected ? 700 : 400,
+              }}>
+                {tag.name}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input value={newTagName} onChange={e => setNewTagName(e.target.value)} placeholder="New tag..." onKeyDown={e => e.key === 'Enter' && handleAddTag()}
+            style={{ ...inp, flex: 1, padding: '4px 8px', fontSize: 10 }} />
+          <button onClick={handleAddTag} style={{ padding: '4px 10px', background: C.bgInput, border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMid, fontSize: 10, cursor: 'pointer', fontFamily: font }}>Add</button>
+        </div>
+      </div>
+
       {error && <div style={{ fontSize: 12, color: '#c00', fontFamily: font }}>{error}</div>}
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={handleSave} style={{ padding: '5px 14px', background: C.accent, border: 'none', borderRadius: 6, color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: font }}>Save</button>
@@ -435,7 +516,6 @@ function EditItemForm({ item, onSaved, onCancel }: { item: TrackedItem; onSaved:
 
 // ── Add Item Form ──
 const IDENTIFIER_HINTS: Record<string, string> = {
-  reddit: 'https://reddit.com/r/subreddit/comments/...',
   github: 'owner/repo (e.g. Digitalcheffe/N.O.R.A)',
   ga4: 'Page path (e.g. /blog/my-post)',
   bing: 'Page URL (e.g. https://yoursite.com/page)',

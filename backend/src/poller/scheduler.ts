@@ -2,12 +2,13 @@ import cron from 'node-cron';
 import { getDueAccounts, getActiveTrackedItems, updatePollSuccess, updatePollFailure } from '../db/queries/accounts';
 import { decryptCredentials } from '../crypto/credentials';
 import { collectGithub } from '../platforms/github';
-import { collectReddit } from '../platforms/reddit';
 import { collectGA4 } from '../platforms/ga4';
 import { collectBing } from '../platforms/bing';
 import { insertPollLog } from '../db/queries/logs';
-import { getTimezone } from '../utils/timezone';
-import type { GithubCredentials, RedditCredentials, GA4Credentials, BingCredentials } from '../types';
+import { getTimezone, getLocalDate } from '../utils/timezone';
+import { writeMetrics } from '../lanes/unify';
+import { getLatestSnapshot } from '../db/queries/metrics';
+import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promise<void> {
   const items = getActiveTrackedItems(account.id);
@@ -34,9 +35,6 @@ async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promi
         case 'github':
           result = await collectGithub(item, credentials as GithubCredentials);
           break;
-        case 'reddit':
-          result = await collectReddit(item, credentials as RedditCredentials);
-          break;
         case 'ga4':
           result = await collectGA4(item, credentials as GA4Credentials);
           break;
@@ -47,6 +45,12 @@ async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promi
 
       if (result.success) {
         insertPollLog({ metric_account_id: account.id, tracked_item_id: item.id, platform: account.platform, level: 'info', message: `Collected ${item.display_name} (${item.platform_identifier})` });
+        // Write to unified metrics tables
+        const snap = getLatestSnapshot(item.id, account.platform);
+        if (snap) {
+          const now = getLocalDate();
+          writeMetrics(item.id, account.platform, 'hourly', now, now, snap);
+        }
       } else {
         insertPollLog({ metric_account_id: account.id, tracked_item_id: item.id, platform: account.platform, level: 'error', message: `Failed ${item.display_name} (${item.platform_identifier}): ${result.error}` });
         allSuccess = false;

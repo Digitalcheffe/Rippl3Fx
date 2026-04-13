@@ -23,7 +23,6 @@
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^3.0.3",
     "qrcode": "^1.5.4",
-    "snoowrap": "^1.23.0",
     "speakeasy": "^2.0.0"
   },
   "devDependencies": {

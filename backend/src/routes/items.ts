@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
+import db from '../db/connection';
 import { getItemsByAccount, getItemById, getAllItems, createItem, updateItem, deleteItem } from '../db/queries/items';
 import { getAccountById } from '../db/queries/accounts';
+import { purgeTrackedMetrics } from '../db/queries/tracked';
 
 const router = Router();
 
@@ -123,15 +125,51 @@ router.post('/:id/backfill', async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/items/:id
+// POST /api/items/:id/untrack — soft-delete: stop polling, clear tags, preserve metrics
+router.post('/:id/untrack', (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const item = getItemById(id);
+  if (!item) { res.status(404).json({ error: 'Item not found' }); return; }
+
+  // Set inactive
+  updateItem(id, { is_active: 0 });
+  // Clear tag associations
+  db.prepare('DELETE FROM item_tags WHERE tracked_item_id = ?').run(id);
+
+  res.json({ success: true, message: 'Item untracked. Metrics preserved.' });
+});
+
+// POST /api/items/:id/retrack — re-enable tracking
+router.post('/:id/retrack', (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const item = getItemById(id);
+  if (!item) { res.status(404).json({ error: 'Item not found' }); return; }
+
+  updateItem(id, { is_active: 1 });
+
+  // Assign tags if provided
+  const { tag_ids } = req.body;
+  if (Array.isArray(tag_ids)) {
+    for (const tagId of tag_ids) {
+      db.prepare('INSERT OR IGNORE INTO item_tags (tracked_item_id, tag_id) VALUES (?, ?)').run(id, tagId);
+    }
+  }
+
+  res.json({ success: true, message: 'Item re-tracked.' });
+});
+
+// DELETE /api/items/:id — permanent delete: purges item + all tracked_metrics
 router.delete('/:id', (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const deleted = deleteItem(id);
-  if (!deleted) {
-    res.status(404).json({ error: 'Item not found' });
-    return;
-  }
-  res.json({ success: true });
+  const item = getItemById(id);
+  if (!item) { res.status(404).json({ error: 'Item not found' }); return; }
+
+  // Purge tracked_metrics first (no CASCADE)
+  const purged = purgeTrackedMetrics(id);
+  // Then delete the item itself (cascades item_tags)
+  deleteItem(id);
+
+  res.json({ success: true, message: `Item permanently deleted. ${purged} metric rows purged.` });
 });
 
 export default router;
