@@ -2,14 +2,13 @@ import cron from 'node-cron';
 import { getDueAccounts, getActiveTrackedItems, updatePollSuccess, updatePollFailure } from '../db/queries/accounts';
 import { decryptCredentials } from '../crypto/credentials';
 import { collectGithub } from '../platforms/github';
-import { collectReddit } from '../platforms/reddit';
 import { collectGA4 } from '../platforms/ga4';
 import { collectBing } from '../platforms/bing';
 import { insertPollLog } from '../db/queries/logs';
 import { getTimezone, getLocalDate } from '../utils/timezone';
 import { writeMetrics } from '../lanes/unify';
 import { getLatestSnapshot } from '../db/queries/metrics';
-import type { GithubCredentials, RedditCredentials, GA4Credentials, BingCredentials } from '../types';
+import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promise<void> {
   const items = getActiveTrackedItems(account.id);
@@ -35,9 +34,6 @@ async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promi
       switch (account.platform) {
         case 'github':
           result = await collectGithub(item, credentials as GithubCredentials);
-          break;
-        case 'reddit':
-          result = await collectReddit(item, credentials as RedditCredentials);
           break;
         case 'ga4':
           result = await collectGA4(item, credentials as GA4Credentials);

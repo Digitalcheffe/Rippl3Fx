@@ -1,5 +1,5 @@
 import db from '../db/connection';
-import { insertGithubDaily, insertRedditDaily } from '../db/queries/rollup';
+import { insertGithubDaily } from '../db/queries/rollup';
 import { computeInterestScore } from '../lanes/score';
 import { decryptCredentials } from '../crypto/credentials';
 import { getYesterdayDate } from '../utils/timezone';
@@ -8,14 +8,12 @@ import type { GA4Credentials, BingCredentials } from '../types';
 
 const DAILY_TABLES: Record<string, string> = {
   github: 'github_daily',
-  reddit: 'reddit_daily',
   ga4:    'ga4_daily',
   bing:   'bing_daily',
 };
 
 const METRIC_COLUMNS: Record<string, string[]> = {
   github: ['stars', 'forks', 'open_issues', 'traffic_views', 'traffic_uniques', 'clones', 'clones_uniques'],
-  reddit: ['upvotes', 'upvote_ratio', 'comment_count', 'view_count'],
   ga4:    ['sessions', 'pageviews', 'users', 'engagement_rate'],
   bing:   ['impressions', 'clicks', 'ctr', 'avg_rank'],
 };
@@ -146,9 +144,6 @@ export async function runDailyRollup(date?: string): Promise<void> {
       switch (item.platform) {
         case 'github':
           insertGithubDaily(item.id, rollupDate);
-          break;
-        case 'reddit':
-          insertRedditDaily(item.id, rollupDate);
           break;
         case 'ga4':
           await fetchGA4Daily(item.id, item.metric_account_id, item.platform_identifier, rollupDate);

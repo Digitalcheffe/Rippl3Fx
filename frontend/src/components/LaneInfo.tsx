@@ -10,12 +10,6 @@ export const LANE_DEFINITIONS: Record<string, Record<string, { metrics: string; 
     Engagement: { metrics: 'Clones + Clone Uniques', description: 'How many people actively pulled your code' },
     Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
   },
-  reddit: {
-    Reach: { metrics: 'View Count', description: 'How many people saw your post (author only)' },
-    Interest: { metrics: 'Score (Upvotes)', description: 'Net votes on your post' },
-    Engagement: { metrics: 'Comment Count', description: 'How many people commented' },
-    Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
-  },
   ga4: {
     Reach: { metrics: 'Pageviews', description: 'Total page views across tracked pages' },
     Interest: { metrics: 'Users', description: 'Unique users who visited' },
@@ -29,9 +23,9 @@ export const LANE_DEFINITIONS: Record<string, Record<string, { metrics: string; 
     Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
   },
   all: {
-    Reach: { metrics: 'Combined across platforms', description: 'GitHub traffic + GA4 pageviews + Bing impressions + Reddit views' },
-    Interest: { metrics: 'Combined across platforms', description: 'GitHub stars/forks + GA4 users + Bing clicks + Reddit score' },
-    Engagement: { metrics: 'Combined across platforms', description: 'GitHub clones + GA4 sessions + Bing CTR + Reddit comments' },
+    Reach: { metrics: 'Combined across platforms', description: 'GitHub traffic + GA4 pageviews + Bing impressions' },
+    Interest: { metrics: 'Combined across platforms', description: 'GitHub stars/forks + GA4 users + Bing clicks' },
+    Engagement: { metrics: 'Combined across platforms', description: 'GitHub clones + GA4 sessions + Bing CTR' },
     Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
   },
 };
@@ -67,8 +61,8 @@ export function LaneTooltip({ lane, platform }: { lane: string; platform?: strin
 
 /** Full info panel toggled by an icon. */
 export function LaneInfoPanel({ platform, onClose }: { platform?: string; onClose: () => void }) {
-  const platforms = platform ? [platform.toLowerCase()] : ['github', 'ga4', 'bing', 'reddit'];
-  const PLATFORM_DISPLAY: Record<string, string> = { github: 'GitHub', ga4: 'GA4', bing: 'Bing', reddit: 'Reddit' };
+  const platforms = platform ? [platform.toLowerCase()] : ['github', 'ga4', 'bing'];
+  const PLATFORM_DISPLAY: Record<string, string> = { github: 'GitHub', ga4: 'GA4', bing: 'Bing' };
 
   return (
     <div style={{

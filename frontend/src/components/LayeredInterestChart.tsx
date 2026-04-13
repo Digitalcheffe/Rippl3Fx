@@ -16,8 +16,8 @@ function getDateLabels(days: number = 7): string[] {
 }
 const DAY_LABELS = getDateLabels(7);
 
-const PLATFORM_ORDER = ['reddit', 'github', 'ga4', 'bing'];
-const PLATFORM_DISPLAY: Record<string, string> = { reddit: 'Reddit', github: 'GitHub', ga4: 'GA4', bing: 'Bing' };
+const PLATFORM_ORDER = ['github', 'ga4', 'bing'];
+const PLATFORM_DISPLAY: Record<string, string> = { github: 'GitHub', ga4: 'GA4', bing: 'Bing' };
 
 const LANE_HISTORY_KEY: Record<string, string> = {
   Reach: 'reachHistory',

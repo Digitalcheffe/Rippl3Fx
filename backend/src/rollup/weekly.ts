@@ -1,6 +1,6 @@
 import db from '../db/connection';
 import {
-  insertGithubWeekly, insertRedditWeekly, insertGA4Weekly, insertBingWeekly,
+  insertGithubWeekly, insertGA4Weekly, insertBingWeekly,
 } from '../db/queries/rollup';
 import { getLocalDate } from '../utils/timezone';
 import { writeTrackedMetric, refreshUnifiedMetric, calcPerformanceScore } from '../lanes/unify';
@@ -44,17 +44,16 @@ export function runWeeklyRollup(weekStartDate?: string): void {
   let count = 0;
 
   const WEEKLY_TABLES: Record<string, string> = {
-    github: 'github_weekly', reddit: 'reddit_weekly', ga4: 'ga4_weekly', bing: 'bing_weekly',
+    github: 'github_weekly', ga4: 'ga4_weekly', bing: 'bing_weekly',
   };
   const DAILY_TABLES: Record<string, string> = {
-    github: 'github_daily', reddit: 'reddit_daily', ga4: 'ga4_daily', bing: 'bing_daily',
+    github: 'github_daily', ga4: 'ga4_daily', bing: 'bing_daily',
   };
 
   for (const item of items) {
     try {
       switch (item.platform) {
         case 'github':  insertGithubWeekly(item.id, periodStart, periodEnd); break;
-        case 'reddit':  insertRedditWeekly(item.id, periodStart, periodEnd); break;
         case 'ga4':     insertGA4Weekly(item.id, periodStart, periodEnd); break;
         case 'bing':    insertBingWeekly(item.id, periodStart, periodEnd); break;
       }

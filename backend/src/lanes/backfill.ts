@@ -3,14 +3,12 @@ import { computeInterestScore } from './score';
 
 const DAILY_TABLES: Record<string, string> = {
   github: 'github_daily',
-  reddit: 'reddit_daily',
   ga4:    'ga4_daily',
   bing:   'bing_daily',
 };
 
 const METRIC_COLUMNS: Record<string, string[]> = {
   github: ['stars', 'forks', 'open_issues', 'traffic_views', 'traffic_uniques', 'clones', 'clones_uniques'],
-  reddit: ['upvotes', 'upvote_ratio', 'comment_count', 'view_count'],
   ga4:    ['sessions', 'pageviews', 'users', 'engagement_rate'],
   bing:   ['impressions', 'clicks', 'ctr', 'avg_rank'],
 };

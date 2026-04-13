@@ -19,7 +19,9 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(curl -s -X POST http://localhost:3000/api/auth/setup -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"password123\"}')",
       "Bash(gh pr create --title 'Issue 18: Frontend scaffold' --body ':*)",
-      "Bash(gh pr create --title 'Issue 19: Settings page' --body ':*)"
+      "Bash(gh pr create --title 'Issue 19: Settings page' --body ':*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
     ]
   }
 }

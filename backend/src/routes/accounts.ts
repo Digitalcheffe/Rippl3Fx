@@ -4,15 +4,14 @@ import { getAllAccounts, getAccountById, createAccount, updateAccount, deleteAcc
 import { encryptCredentials, decryptCredentials } from '../crypto/credentials';
 import { purgeTrackedMetricsByAccount } from '../db/queries/tracked';
 import { collectGithub } from '../platforms/github';
-import { collectReddit } from '../platforms/reddit';
 import { collectGA4 } from '../platforms/ga4';
 import { collectBing } from '../platforms/bing';
 import { insertPollLog } from '../db/queries/logs';
-import type { GithubCredentials, RedditCredentials, GA4Credentials, BingCredentials } from '../types';
+import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 const router = Router();
 
-const VALID_PLATFORMS = ['reddit', 'github', 'ga4', 'bing'];
+const VALID_PLATFORMS = ['github', 'ga4', 'bing'];
 
 // GET /api/accounts
 router.get('/', (_req: Request, res: Response) => {
@@ -178,7 +177,6 @@ router.post('/:id/poll-now', async (req: Request, res: Response) => {
     try {
       switch (fullAccount.platform) {
         case 'github': result = await collectGithub(item, credentials as GithubCredentials); break;
-        case 'reddit': result = await collectReddit(item, credentials as RedditCredentials); break;
         case 'ga4': result = await collectGA4(item, credentials as GA4Credentials); break;
         case 'bing': result = await collectBing(item, credentials as BingCredentials); break;
       }

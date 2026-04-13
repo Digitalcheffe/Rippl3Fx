@@ -2,28 +2,24 @@ import db from '../connection';
 
 const SNAPSHOT_TABLES: Record<string, string> = {
   github: 'github_snapshots',
-  reddit: 'reddit_snapshots',
   ga4:    'ga4_snapshots',
   bing:   'bing_snapshots',
 };
 
 const DAILY_TABLES: Record<string, string> = {
   github: 'github_daily',
-  reddit: 'reddit_daily',
   ga4:    'ga4_daily',
   bing:   'bing_daily',
 };
 
 const WEEKLY_TABLES: Record<string, string> = {
   github: 'github_weekly',
-  reddit: 'reddit_weekly',
   ga4:    'ga4_weekly',
   bing:   'bing_weekly',
 };
 
 const MONTHLY_TABLES: Record<string, string> = {
   github: 'github_monthly',
-  reddit: 'reddit_monthly',
   ga4:    'ga4_monthly',
   bing:   'bing_monthly',
 };

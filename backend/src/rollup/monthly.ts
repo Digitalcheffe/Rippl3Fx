@@ -1,6 +1,6 @@
 import db from '../db/connection';
 import {
-  insertGithubMonthly, insertRedditMonthly, insertGA4Monthly, insertBingMonthly,
+  insertGithubMonthly, insertGA4Monthly, insertBingMonthly,
 } from '../db/queries/rollup';
 import { getLocalYearMonth } from '../utils/timezone';
 import { writeTrackedMetric, refreshUnifiedMetric } from '../lanes/unify';
@@ -42,17 +42,16 @@ export function runMonthlyRollup(year?: number, month?: number): void {
   let count = 0;
 
   const MONTHLY_TABLES: Record<string, string> = {
-    github: 'github_monthly', reddit: 'reddit_monthly', ga4: 'ga4_monthly', bing: 'bing_monthly',
+    github: 'github_monthly', ga4: 'ga4_monthly', bing: 'bing_monthly',
   };
   const DAILY_TABLES: Record<string, string> = {
-    github: 'github_daily', reddit: 'reddit_daily', ga4: 'ga4_daily', bing: 'bing_daily',
+    github: 'github_daily', ga4: 'ga4_daily', bing: 'bing_daily',
   };
 
   for (const item of items) {
     try {
       switch (item.platform) {
         case 'github':  insertGithubMonthly(item.id, periodStart, periodEnd); break;
-        case 'reddit':  insertRedditMonthly(item.id, periodStart, periodEnd); break;
         case 'ga4':     insertGA4Monthly(item.id, periodStart, periodEnd); break;
         case 'bing':    insertBingMonthly(item.id, periodStart, periodEnd); break;
       }

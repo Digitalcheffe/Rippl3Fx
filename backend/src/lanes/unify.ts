@@ -21,12 +21,6 @@ export function mapToLanes(platform: string, row: Record<string, any>): LaneValu
         interest: (row.stars ?? 0) + (row.forks ?? 0),
         engagement: (row.clones ?? 0) + (row.clones_uniques ?? 0),
       };
-    case 'reddit':
-      return {
-        reach: row.view_count ?? 0,
-        interest: row.upvotes ?? row.score ?? 0,
-        engagement: row.comment_count ?? 0,
-      };
     case 'ga4':
       return {
         reach: row.pageviews ?? 0,

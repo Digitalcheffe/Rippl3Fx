@@ -73,7 +73,7 @@ router.get('/dashboard', (req: Request, res: Response) => {
 
   // Platform-level data from unified_metrics
   const platforms: Record<string, any> = {};
-  for (const p of ['reddit', 'github', 'ga4', 'bing']) {
+  for (const p of ['github', 'ga4', 'bing']) {
     const { current, previous } = getUnifiedPair(p, range);
     if (current) {
       platforms[p] = {

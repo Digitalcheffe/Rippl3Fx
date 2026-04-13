@@ -36,7 +36,7 @@ export function getAllPlatformLatest(periodType: string): Record<string, any>[] 
 
 /** Get all platforms' two most recent rows for velocity (for Dashboard). */
 export function getAllPlatformPairs(periodType: string): Record<string, { current: Record<string, any> | null; previous: Record<string, any> | null }> {
-  const platforms = ['reddit', 'github', 'ga4', 'bing'];
+  const platforms = ['github', 'ga4', 'bing'];
   const result: Record<string, { current: Record<string, any> | null; previous: Record<string, any> | null }> = {};
   for (const p of platforms) {
     result[p] = getUnifiedPair(p, periodType);
@@ -46,7 +46,7 @@ export function getAllPlatformPairs(periodType: string): Record<string, { curren
 
 /** Get unified history for all platforms (for combined chart). */
 export function getAllPlatformHistory(periodType: string, limit: number = 7): Record<string, Record<string, any>[]> {
-  const platforms = ['reddit', 'github', 'ga4', 'bing'];
+  const platforms = ['github', 'ga4', 'bing'];
   const result: Record<string, Record<string, any>[]> = {};
   for (const p of platforms) {
     result[p] = getUnifiedHistory(p, periodType, limit);

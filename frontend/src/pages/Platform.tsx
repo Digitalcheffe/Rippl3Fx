@@ -15,7 +15,7 @@ import { LaneInfoButton, LaneInfoPanel } from '../components/LaneInfo';
 const font = "'DM Mono', monospace";
 
 const PLATFORM_NAMES: Record<string, string> = {
-  reddit: 'Reddit', github: 'GitHub', ga4: 'GA4', bing: 'Bing',
+  github: 'GitHub', ga4: 'GA4', bing: 'Bing',
 };
 
 interface Account {
@@ -104,11 +104,6 @@ export default function Platform() {
     });
   }, [items]);
 
-  // Load all tags for add-item tag select
-  useEffect(() => {
-    apiGet<Tag[]>('/tags').then(setAllTags).catch(() => {});
-  }, []);
-
   // Load dashboard data for platform-level metrics
   const [platformData, setPlatformData] = useState<any>(null);
   useEffect(() => {
@@ -121,6 +116,11 @@ export default function Platform() {
       })
       .catch(() => {});
   }, [platform, items, timeRange]);
+
+  // Load all tags for add-item tag select
+  useEffect(() => {
+    apiGet<Tag[]>('/tags').then(setAllTags).catch(() => {});
+  }, []);
 
   // Lane summary from platform-level unified_metrics
   const laneSummaryItems = platformData ? [{
@@ -516,7 +516,6 @@ function EditItemForm({ item, allTags, currentTagIds, onSaved, onCancel }: {
 
 // ── Add Item Form ──
 const IDENTIFIER_HINTS: Record<string, string> = {
-  reddit: 'https://reddit.com/r/subreddit/comments/...',
   github: 'owner/repo (e.g. Digitalcheffe/N.O.R.A)',
   ga4: 'Page path (e.g. /blog/my-post)',
   bing: 'Page URL (e.g. https://yoursite.com/page)',

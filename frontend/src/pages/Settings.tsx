@@ -20,7 +20,7 @@ const labelStyle: React.CSSProperties = {
   fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.8,
 };
 
-const PLATFORMS = ['Reddit', 'GitHub', 'GA4', 'Bing'];
+const PLATFORMS = ['GitHub', 'GA4', 'Bing'];
 
 interface Account {
   id: number;
@@ -33,12 +33,6 @@ interface Account {
 }
 
 const CREDENTIAL_FIELDS: Record<string, Array<{ key: string; label: string; type?: string }>> = {
-  reddit: [
-    { key: 'username', label: 'Reddit Username' },
-    { key: 'password', label: 'Reddit Password', type: 'password' },
-    { key: 'clientId', label: 'Client ID' },
-    { key: 'clientSecret', label: 'Client Secret', type: 'password' },
-  ],
   github: [
     { key: 'personalAccessToken', label: 'Personal Access Token', type: 'password' },
   ],
@@ -354,32 +348,28 @@ function AccountsTab() {
                   <div style={{ fontSize: 11, color: C.textFaint, fontFamily: font }}>No tracked items</div>
                 ) : (
                   <>
-                    {a.platform !== 'reddit' && (
-                      <div style={{ marginBottom: 10 }}>
-                        <button onClick={() => handleBackfillAll(a.id)} disabled={backfillingId !== null} style={{
-                          padding: '4px 12px', background: C.accent + '15',
-                          border: `1px solid ${C.accent}40`, borderRadius: 5,
-                          color: C.accent, fontSize: 10, fontWeight: 700,
-                          cursor: backfillingId !== null ? 'wait' : 'pointer', fontFamily: font,
-                          opacity: backfillingId !== null ? 0.6 : 1,
-                        }}>Backfill All (14 days)</button>
-                      </div>
-                    )}
+                    <div style={{ marginBottom: 10 }}>
+                      <button onClick={() => handleBackfillAll(a.id)} disabled={backfillingId !== null} style={{
+                        padding: '4px 12px', background: C.accent + '15',
+                        border: `1px solid ${C.accent}40`, borderRadius: 5,
+                        color: C.accent, fontSize: 10, fontWeight: 700,
+                        cursor: backfillingId !== null ? 'wait' : 'pointer', fontFamily: font,
+                        opacity: backfillingId !== null ? 0.6 : 1,
+                      }}>Backfill All (14 days)</button>
+                    </div>
                     {accountItems.map(item => (
                       <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: `1px solid ${C.border}22` }}>
                         <div>
                           <div style={{ fontSize: 12, color: C.text, fontFamily: font, fontWeight: 600 }}>{item.display_name}</div>
                           <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font }}>{item.platform_identifier}</div>
                         </div>
-                        {a.platform !== 'reddit' && (
-                          <button onClick={() => handleBackfill(item.id)} disabled={backfillingId === item.id} style={{
-                            padding: '3px 8px', background: 'none',
-                            border: `1px solid ${C.accent}55`, borderRadius: 4,
-                            color: C.accent, fontSize: 9,
-                            cursor: backfillingId === item.id ? 'wait' : 'pointer',
-                            fontFamily: font, opacity: backfillingId === item.id ? 0.6 : 1,
-                          }}>{backfillingId === item.id ? 'Backfilling...' : 'Backfill 14d'}</button>
-                        )}
+                        <button onClick={() => handleBackfill(item.id)} disabled={backfillingId === item.id} style={{
+                          padding: '3px 8px', background: 'none',
+                          border: `1px solid ${C.accent}55`, borderRadius: 4,
+                          color: C.accent, fontSize: 9,
+                          cursor: backfillingId === item.id ? 'wait' : 'pointer',
+                          fontFamily: font, opacity: backfillingId === item.id ? 0.6 : 1,
+                        }}>{backfillingId === item.id ? 'Backfilling...' : 'Backfill 14d'}</button>
                       </div>
                     ))}
                   </>

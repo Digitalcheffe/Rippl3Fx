@@ -25,7 +25,6 @@ function getAccountCredentials(accountId: number): { credentials: any; platform:
 
 const LANE_CALC: Record<string, { reach: string[]; interest: string[]; engagement: string[] }> = {
   github: { reach: ['traffic_views', 'traffic_uniques'], interest: ['stars', 'forks'], engagement: ['clones', 'clones_uniques'] },
-  reddit: { reach: ['view_count'], interest: ['upvotes'], engagement: ['comment_count'] },
   ga4:    { reach: ['pageviews'], interest: ['users'], engagement: ['sessions'] },
   bing:   { reach: ['impressions'], interest: ['clicks'], engagement: [] },
 };
@@ -224,7 +223,6 @@ export async function runHistoricalBackfill(trackedItemId: number, accountId: nu
       case 'github': await backfillGithub(trackedItemId, accountId, platformIdentifier); break;
       case 'ga4':    await backfillGA4(trackedItemId, accountId, platformIdentifier); break;
       case 'bing':   await backfillBing(trackedItemId, accountId, platformIdentifier); break;
-      // Reddit has no historical API
     }
     insertPollLog({ metric_account_id: accountId, tracked_item_id: trackedItemId, platform, level: 'info', message: `Backfill completed for ${platformIdentifier}` });
   } catch (err: any) {
