@@ -120,6 +120,7 @@ export default function Dashboard() {
       },
       performanceScore: pData.performanceScore,
       distribution: dist,
+      peaks: pData.peaks,
     };
   });
 

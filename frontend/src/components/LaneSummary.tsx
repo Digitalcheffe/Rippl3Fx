@@ -73,7 +73,7 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
                 const peakKey = `${lane.toLowerCase()}_peak` as keyof typeof peaks;
                 const peakVal = peaks[peakKey] as number;
                 return peakVal > 0 ? (
-                  <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>peak: {fmt(peakVal)}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.textFaint, fontFamily: font }}>/ {fmt(peakVal)}</div>
                 ) : null;
               })()}
             </div>

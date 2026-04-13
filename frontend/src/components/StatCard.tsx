@@ -37,6 +37,7 @@ export interface StatCardItem {
   lanes: Record<string, LaneData>;
   performanceScore?: number;
   distribution?: { reach: number; interest: number; engagement: number };
+  peaks?: { reach_peak: number; interest_peak: number; engagement_peak: number } | null;
 }
 
 interface LaneRowProps {
@@ -44,9 +45,10 @@ interface LaneRowProps {
   data: LaneData;
   compact?: boolean;
   distPct?: number;
+  peak?: number;
 }
 
-function LaneRow({ lane, data, compact = false, distPct }: LaneRowProps) {
+function LaneRow({ lane, data, compact = false, distPct, peak }: LaneRowProps) {
   const color = C[lane as keyof typeof C] as string;
   const vc = velColor(data.velocity);
   return (
@@ -54,6 +56,9 @@ function LaneRow({ lane, data, compact = false, distPct }: LaneRowProps) {
       <div style={{ width: compact ? 60 : 72, flexShrink: 0, textAlign: 'right' }}>
         <div style={{ fontSize: 10, color: C.textFaint, textTransform: 'uppercase', letterSpacing: 1, fontFamily: font }}>{lane}</div>
         <div style={{ fontSize: compact ? 14 : 16, fontWeight: 900, color: C.text, fontFamily: font, lineHeight: 1.2, letterSpacing: -0.5 }}>{fmt(data.current)}</div>
+        {peak != null && peak > 0 && (
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.textFaint, fontFamily: font }}>/ {fmt(peak)}</div>
+        )}
       </div>
       <Sparkline data={data.history} color={color} width={compact ? 64 : 76} height={22} />
       {data.velocity !== 0 && (
@@ -124,7 +129,9 @@ export default function StatCard({ item, index = 0, onClick }: { item: StatCardI
           if (!data) return null;
           const dist = item.distribution;
           const pct = dist ? dist[lane.toLowerCase() as keyof typeof dist] : undefined;
-          return <LaneRow key={lane} lane={lane} data={data} distPct={pct} />;
+          const peakKey = `${lane.toLowerCase()}_peak` as string;
+          const peakVal = item.peaks ? (item.peaks as any)[peakKey] : undefined;
+          return <LaneRow key={lane} lane={lane} data={data} distPct={pct} peak={peakVal} />;
         })}
       </div>
 
