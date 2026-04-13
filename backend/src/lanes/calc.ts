@@ -73,6 +73,18 @@ export function calcLanesFromRaw(
   return lanes;
 }
 
+/** Set baseline cumulative values for delta tracking (called after backfill). */
+export function setPreviousBaseline(accountId: number, metrics: Record<string, number>): void {
+  for (const [name, value] of Object.entries(metrics)) {
+    db.prepare(`
+      INSERT INTO metric_previous (metric_account_id, metric_name, previous_value)
+      VALUES (?, ?, ?)
+      ON CONFLICT(metric_account_id, metric_name) DO UPDATE SET
+        previous_value = excluded.previous_value, updated_at = CURRENT_TIMESTAMP
+    `).run(accountId, name, value);
+  }
+}
+
 /**
  * Calculate lane values for backfill — no delta tracking, just use raw values.
  * Used when we have per-day data already (traffic views per day, etc.)

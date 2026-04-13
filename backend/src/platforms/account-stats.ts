@@ -4,7 +4,7 @@ import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import axios from 'axios';
 import { getLocalDate } from '../utils/timezone';
 import { calcPerformanceScore, updatePeaks } from '../lanes/unify';
-import { getPerformanceWeights } from '../routes/performance';
+import { calcLanesFromRaw, calcLanesFromDaily } from '../lanes/calc';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 interface LaneValues { reach: number; interest: number; engagement: number }
@@ -26,114 +26,94 @@ function writeAccountUnified(platform: string, lanes: LaneValues): void {
   updatePeaks(null, platform, 'daily', today, lanes);
 }
 
+/** Collect raw metrics for a platform account. Returns metric_name→value map. */
+export async function collectRawMetrics(platform: string, credentials: any): Promise<Record<string, number>> {
+  const raw: Record<string, number> = {};
+
+  switch (platform) {
+    case 'github': {
+      const creds = credentials as GithubCredentials;
+      const octokit = new Octokit({ auth: creds.personalAccessToken });
+      const { data: repos } = await octokit.repos.listForAuthenticatedUser({ per_page: 100, type: 'owner' });
+
+      raw.stars = 0; raw.watchers = 0; raw.forks = 0;
+      raw.traffic_views = 0; raw.clones = 0; raw.release_downloads = 0;
+
+      for (const repo of repos) {
+        raw.stars += repo.stargazers_count || 0;
+        raw.forks += repo.forks_count || 0;
+        raw.watchers += (repo as any).subscribers_count || 0;
+
+        try {
+          const { data: views } = await octokit.repos.getViews({ owner: repo.owner.login, repo: repo.name, per: 'day' });
+          raw.traffic_views += views.count || 0;
+        } catch { /* no access */ }
+
+        try {
+          const { data: clones } = await octokit.repos.getClones({ owner: repo.owner.login, repo: repo.name, per: 'day' });
+          raw.clones += clones.count || 0;
+        } catch { /* no access */ }
+
+        try {
+          const { data: releases } = await octokit.repos.listReleases({ owner: repo.owner.login, repo: repo.name, per_page: 100 });
+          for (const release of releases) {
+            for (const asset of release.assets || []) raw.release_downloads += asset.download_count || 0;
+          }
+        } catch { /* ignore */ }
+      }
+      break;
+    }
+
+    case 'ga4': {
+      const creds = credentials as GA4Credentials;
+      const serviceAccount = JSON.parse(creds.serviceAccountJson);
+      const client = new BetaAnalyticsDataClient({
+        credentials: { client_email: serviceAccount.client_email, private_key: serviceAccount.private_key },
+        projectId: serviceAccount.project_id,
+      });
+
+      const [response] = await client.runReport({
+        property: `properties/${creds.propertyId}`,
+        dateRanges: [{ startDate: 'today', endDate: 'today' }],
+        metrics: [{ name: 'screenPageViews' }, { name: 'totalUsers' }, { name: 'sessions' }],
+      });
+
+      const row = response.rows?.[0];
+      const m = row?.metricValues;
+      raw.pageviews = m?.[0]?.value ? parseInt(m[0].value, 10) : 0;
+      raw.users = m?.[1]?.value ? parseInt(m[1].value, 10) : 0;
+      raw.sessions = m?.[2]?.value ? parseInt(m[2].value, 10) : 0;
+      break;
+    }
+
+    case 'bing': {
+      const creds = credentials as BingCredentials;
+      const { data } = await axios.get('https://ssl.bing.com/webmaster/api.svc/json/GetPageStats', {
+        params: { apikey: creds.apiKey, siteUrl: creds.siteUrl },
+      });
+
+      const entries = data?.d ?? data;
+      raw.impressions = 0; raw.clicks = 0; raw.ctr = 0;
+      if (Array.isArray(entries)) {
+        let totalCtr = 0, ctrCount = 0;
+        for (const entry of entries) {
+          raw.impressions += entry.Impressions ?? 0;
+          raw.clicks += entry.Clicks ?? 0;
+          if (entry.Impressions > 0) { totalCtr += (entry.Clicks ?? 0) / entry.Impressions; ctrCount++; }
+        }
+        raw.ctr = ctrCount > 0 ? Math.round((totalCtr / ctrCount) * 10000) / 100 : 0;
+      }
+      break;
+    }
+  }
+
+  return raw;
+}
+
 export async function collectAccountStats(accountId: number, platform: string, credentials: any): Promise<{ success: boolean; lanes?: LaneValues; error?: string }> {
   try {
-    let lanes: LaneValues = { reach: 0, interest: 0, engagement: 0 };
-
-    switch (platform) {
-      case 'github': {
-        const creds = credentials as GithubCredentials;
-        const octokit = new Octokit({ auth: creds.personalAccessToken });
-        const { data: repos } = await octokit.repos.listForAuthenticatedUser({ per_page: 100, type: 'owner' });
-
-        let totalTrafficViews = 0;
-        let totalStars = 0;
-        let totalWatchers = 0;
-        let totalForks = 0;
-        let totalClones = 0;
-        let totalReleaseDownloads = 0;
-
-        for (const repo of repos) {
-          totalStars += repo.stargazers_count || 0;
-          totalForks += repo.forks_count || 0;
-          totalWatchers += (repo as any).subscribers_count || 0;
-
-          // Traffic (requires push access, may 403)
-          try {
-            const { data: views } = await octokit.repos.getViews({ owner: repo.owner.login, repo: repo.name, per: 'day' });
-            totalTrafficViews += views.count || 0;
-          } catch { /* no access */ }
-
-          // Clones
-          try {
-            const { data: clones } = await octokit.repos.getClones({ owner: repo.owner.login, repo: repo.name, per: 'day' });
-            totalClones += clones.count || 0;
-          } catch { /* no access */ }
-
-          // Release downloads
-          try {
-            const { data: releases } = await octokit.repos.listReleases({ owner: repo.owner.login, repo: repo.name, per_page: 100 });
-            for (const release of releases) {
-              for (const asset of release.assets || []) {
-                totalReleaseDownloads += asset.download_count || 0;
-              }
-            }
-          } catch { /* ignore */ }
-        }
-
-        lanes = {
-          reach: totalTrafficViews,
-          interest: totalStars + totalWatchers,
-          engagement: totalForks + totalClones + totalReleaseDownloads,
-        };
-        break;
-      }
-
-      case 'ga4': {
-        const creds = credentials as GA4Credentials;
-        const serviceAccount = JSON.parse(creds.serviceAccountJson);
-        const client = new BetaAnalyticsDataClient({
-          credentials: { client_email: serviceAccount.client_email, private_key: serviceAccount.private_key },
-          projectId: serviceAccount.project_id,
-        });
-
-        const [response] = await client.runReport({
-          property: `properties/${creds.propertyId}`,
-          dateRanges: [{ startDate: 'today', endDate: 'today' }],
-          metrics: [
-            { name: 'screenPageViews' },
-            { name: 'totalUsers' },
-            { name: 'sessions' },
-          ],
-        });
-
-        const row = response.rows?.[0];
-        const m = row?.metricValues;
-        lanes = {
-          reach: m?.[0]?.value ? parseInt(m[0].value, 10) : 0,
-          interest: m?.[1]?.value ? parseInt(m[1].value, 10) : 0,
-          engagement: m?.[2]?.value ? parseInt(m[2].value, 10) : 0,
-        };
-        break;
-      }
-
-      case 'bing': {
-        const creds = credentials as BingCredentials;
-        const { data } = await axios.get('https://ssl.bing.com/webmaster/api.svc/json/GetPageStats', {
-          params: { apikey: creds.apiKey, siteUrl: creds.siteUrl },
-        });
-
-        const entries = data?.d ?? data;
-        if (Array.isArray(entries)) {
-          let impressions = 0, clicks = 0, totalCtr = 0, ctrCount = 0;
-          for (const entry of entries) {
-            impressions += entry.Impressions ?? 0;
-            clicks += entry.Clicks ?? 0;
-            if (entry.Impressions > 0) {
-              totalCtr += (entry.Clicks ?? 0) / entry.Impressions;
-              ctrCount++;
-            }
-          }
-          const avgCtr = ctrCount > 0 ? totalCtr / ctrCount : 0;
-          lanes = {
-            reach: impressions,
-            interest: clicks,
-            engagement: Math.round(avgCtr * 10000) / 100,
-          };
-        }
-        break;
-      }
-    }
+    const raw = await collectRawMetrics(platform, credentials);
+    const lanes = calcLanesFromRaw(accountId, platform, raw);
 
     writeAccountUnified(platform, lanes);
     console.log(`[AccountStats] Collected ${platform} account-level: reach=${lanes.reach} interest=${lanes.interest} engagement=${lanes.engagement}`);
@@ -170,7 +150,7 @@ function writeUnifiedRow(platform: string, periodType: string, periodStart: stri
 export async function backfillAccountStats(accountId: number, platform: string, credentials: any): Promise<void> {
   console.log(`[AccountStats] Backfilling ${platform} account-level (${BACKFILL_DAYS} days)`);
 
-  const dailyData: Array<{ date: string; lanes: LaneValues }> = [];
+  const dailyData: Array<{ date: string; dailyMetrics: Record<string, number> }> = [];
 
   try {
     switch (platform) {
@@ -217,21 +197,26 @@ export async function backfillAccountStats(accountId: number, platform: string, 
           } catch { /* ignore */ }
         }
 
-        // Build daily rows — incremental metrics per day, cumulative only on today
-        const today = getLocalDate();
+        // Build daily rows using calcLanesFromDaily
+        // Incremental metrics have per-day values, cumulative metrics = 0 (no historical data)
         for (let i = BACKFILL_DAYS; i >= 0; i--) {
           const d = new Date(Date.now() - i * 86_400_000);
           const date = getLocalDate(d);
-          const isToday = date === today;
           dailyData.push({
             date,
-            lanes: {
-              reach: viewsByDay[date] || 0,
-              interest: isToday ? totalStars + totalWatchers : 0, // cumulative only on today
-              engagement: (isToday ? totalForks : 0) + (clonesByDay[date] || 0) + (isToday ? totalReleaseDownloads : 0),
+            dailyMetrics: {
+              traffic_views: viewsByDay[date] || 0,
+              clones: clonesByDay[date] || 0,
+              stars: 0, watchers: 0, forks: 0, release_downloads: 0, // no historical delta data
             },
           });
         }
+
+        // Set baseline for delta tracking going forward
+        const { setPreviousBaseline } = require('../lanes/calc');
+        setPreviousBaseline(accountId, {
+          stars: totalStars, watchers: totalWatchers, forks: totalForks, release_downloads: totalReleaseDownloads,
+        });
         break;
       }
 
@@ -265,10 +250,10 @@ export async function backfillAccountStats(accountId: number, platform: string, 
           const m = row.metricValues || [];
           dailyData.push({
             date,
-            lanes: {
-              reach: m[0]?.value ? parseInt(m[0].value, 10) : 0,
-              interest: m[1]?.value ? parseInt(m[1].value, 10) : 0,
-              engagement: m[2]?.value ? parseInt(m[2].value, 10) : 0,
+            dailyMetrics: {
+              pageviews: m[0]?.value ? parseInt(m[0].value, 10) : 0,
+              users: m[1]?.value ? parseInt(m[1].value, 10) : 0,
+              sessions: m[2]?.value ? parseInt(m[2].value, 10) : 0,
             },
           });
         }
@@ -297,10 +282,10 @@ export async function backfillAccountStats(accountId: number, platform: string, 
             const ctr = vals.impressions > 0 ? vals.clicks / vals.impressions : 0;
             dailyData.push({
               date,
-              lanes: {
-                reach: vals.impressions,
-                interest: vals.clicks,
-                engagement: Math.round(ctr * 10000) / 100,
+              dailyMetrics: {
+                impressions: vals.impressions,
+                clicks: vals.clicks,
+                ctr: Math.round(ctr * 10000) / 100,
               },
             });
           }
@@ -310,13 +295,17 @@ export async function backfillAccountStats(accountId: number, platform: string, 
     }
 
     // Write daily rows
-    for (const { date, lanes } of dailyData) {
+    // Write daily rows using config-driven lane calculation
+    const computed: Array<{ date: string; lanes: LaneValues }> = [];
+    for (const { date, dailyMetrics } of dailyData) {
+      const lanes = calcLanesFromDaily(platform, dailyMetrics);
       writeUnifiedRow(platform, 'daily', date, date, lanes);
+      computed.push({ date, lanes });
     }
 
     // Roll up weekly
     const weeks: Record<string, LaneValues> = {};
-    for (const { date, lanes } of dailyData) {
+    for (const { date, lanes } of computed) {
       const mon = getMonday(date);
       if (!weeks[mon]) weeks[mon] = { reach: 0, interest: 0, engagement: 0 };
       weeks[mon].reach += lanes.reach;
@@ -330,7 +319,7 @@ export async function backfillAccountStats(accountId: number, platform: string, 
 
     // Roll up monthly
     const months: Record<string, LaneValues> = {};
-    for (const { date, lanes } of dailyData) {
+    for (const { date, lanes } of computed) {
       const ym = date.slice(0, 7);
       if (!months[ym]) months[ym] = { reach: 0, interest: 0, engagement: 0 };
       months[ym].reach += lanes.reach;
