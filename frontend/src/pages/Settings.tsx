@@ -331,13 +331,16 @@ function AccountsTab() {
         return (
           <div key={a.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
             <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ cursor: 'pointer' }} onClick={() => toggleExpand(a.id)}>
+              <div>
                 <PlatformPill platform={displayPlatform} />
                 <div style={{ fontSize: 10, color: C.textFaint, marginTop: 5, fontFamily: font }}>
-                  {a.display_name} · polls every {a.polling_interval_min} min {isExpanded ? '▲' : '▼'}
+                  {a.display_name} · polls every {a.polling_interval_min} min
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => toggleExpand(a.id)} style={{ padding: '4px 10px', background: C.accent + '15', border: `1px solid ${C.accent}55`, borderRadius: 5, color: C.accent, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: font }}>
+                  {isExpanded ? 'Hide Items' : 'Backfill Items'}
+                </button>
                 <button onClick={() => { setEditAccount(a); setShowModal(true); }} style={{ padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMid, fontSize: 11, cursor: 'pointer', fontFamily: font }}>Edit</button>
                 <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Remove</button>
               </div>
@@ -509,6 +512,7 @@ interface PollLog {
 function TrackedItemsTab() {
   const [items, setItems] = useState<Array<{ id: number; platform_identifier: string; display_name: string; is_active: number; platform: string; account_name: string }>>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [backfillingId, setBackfillingId] = useState<number | null>(null);
   const [filter, setFilter] = useState<'all' | 'tracking' | 'untracked'>('all');
 
   const loadItems = async () => {
@@ -543,6 +547,12 @@ function TrackedItemsTab() {
   const handleRetrack = async (id: number) => {
     await apiPost(`/items/${id}/retrack`, {});
     loadItems();
+  };
+
+  const handleBackfill = async (id: number) => {
+    setBackfillingId(id);
+    try { await apiPost(`/items/${id}/backfill`); } catch { /* ignore */ }
+    setTimeout(() => setBackfillingId(null), 3000);
   };
 
   const filtered = items.filter(i => {
@@ -594,6 +604,11 @@ function TrackedItemsTab() {
                   <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font }}>{item.platform_identifier} · {item.account_name}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <button onClick={() => handleBackfill(item.id)} disabled={backfillingId === item.id} style={{
+                    padding: '4px 10px', background: C.accent + '15', border: `1px solid ${C.accent}55`,
+                    borderRadius: 5, color: C.accent, fontSize: 10, cursor: backfillingId === item.id ? 'wait' : 'pointer',
+                    fontFamily: font, opacity: backfillingId === item.id ? 0.6 : 1,
+                  }}>{backfillingId === item.id ? 'Backfilling...' : 'Backfill 14d'}</button>
                   {item.is_active ? (
                     <button onClick={() => handleUntrack(item.id)} style={{
                       padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`,
