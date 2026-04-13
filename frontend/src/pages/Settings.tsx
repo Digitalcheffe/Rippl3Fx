@@ -58,6 +58,7 @@ export default function Settings() {
   const tabs = [
     { k: 'profile', l: 'Profile' },
     { k: 'accounts', l: 'Platform Accounts' },
+    { k: 'weights', l: 'Performance Weights' },
     { k: 'logs', l: 'Poll Logs' },
   ];
 
@@ -93,6 +94,7 @@ export default function Settings() {
             </>
           )}
           {tab === 'accounts' && <AccountsTab />}
+          {tab === 'weights' && <WeightsTab />}
           {tab === 'logs' && <LogsTab />}
         </div>
       </div>
@@ -508,6 +510,94 @@ interface PollLog {
   level: 'info' | 'warn' | 'error';
   message: string;
   created_at: string;
+}
+
+// ── Performance Weights Tab ──
+function WeightsTab() {
+  const [reach, setReach] = useState(20);
+  const [interest, setInterest] = useState(30);
+  const [engagement, setEngagement] = useState(50);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    apiGet<{ reach_weight: number; interest_weight: number; engagement_weight: number }>('/performance/weights')
+      .then(w => {
+        setReach(Math.round(w.reach_weight * 100));
+        setInterest(Math.round(w.interest_weight * 100));
+        setEngagement(Math.round(w.engagement_weight * 100));
+      })
+      .catch(() => {});
+  }, []);
+
+  const total = reach + interest + engagement;
+  const isValid = total === 100;
+
+  const handleSave = async () => {
+    setError('');
+    setSaved(false);
+    if (!isValid) { setError('Weights must sum to 100%'); return; }
+    try {
+      await apiPut('/performance/weights', {
+        reach_weight: reach / 100,
+        interest_weight: interest / 100,
+        engagement_weight: engagement / 100,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const sliderStyle: React.CSSProperties = { width: '100%', cursor: 'pointer' };
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, fontFamily: font, marginBottom: 4 }}>Performance Score Weights</div>
+      <div style={{ fontSize: 11, color: C.textSoft, fontFamily: font, marginBottom: 16 }}>
+        Adjust how much each lane contributes to the Performance Score. Must sum to 100%.
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {([
+          { label: 'Reach', value: reach, color: C.Reach, set: setReach },
+          { label: 'Interest', value: interest, color: C.Interest, set: setInterest },
+          { label: 'Engagement', value: engagement, color: C.Engagement, set: setEngagement },
+        ] as const).map(({ label, value, color, set }) => (
+          <div key={label}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: color as string, fontFamily: font, textTransform: 'uppercase', letterSpacing: 1 }}>{label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <input type="number" min={0} max={100} value={value}
+                  onChange={e => { const v = Math.max(0, Math.min(100, Number(e.target.value) || 0)); set(v); }}
+                  style={{ width: 48, padding: '2px 6px', background: C.bgInput, border: `1px solid ${C.border}`, borderRadius: 5, color: C.text, fontSize: 13, fontWeight: 900, fontFamily: font, textAlign: 'right', outline: 'none' }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 900, color: C.textFaint, fontFamily: font }}>%</span>
+              </div>
+            </div>
+            <input type="range" min={0} max={100} value={value} onChange={e => set(Number(e.target.value))} style={sliderStyle} />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: isValid ? C.up : '#c00', fontFamily: font }}>
+          Total: {total}% {isValid ? '✓' : '(must be 100%)'}
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {saved && <span style={{ fontSize: 11, color: C.up, fontFamily: font, fontWeight: 700 }}>Saved</span>}
+          {error && <span style={{ fontSize: 11, color: '#c00', fontFamily: font }}>{error}</span>}
+          <button onClick={handleSave} disabled={!isValid} style={{ ...btnP, opacity: isValid ? 1 : 0.5 }}>Save Weights</button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 20, padding: '12px 16px', background: C.bgInput, borderRadius: 8, fontSize: 11, color: C.textSoft, fontFamily: font, lineHeight: 1.6 }}>
+        <strong style={{ color: C.text }}>Formula:</strong> Performance = (Reach × {reach}%) + (Interest × {interest}%) + (Engagement × {engagement}%)
+        <br />Each lane is normalized to 0–100 before weighting. The final score is a weighted average, also 0–100.
+      </div>
+    </div>
+  );
 }
 
 function LogsTab() {

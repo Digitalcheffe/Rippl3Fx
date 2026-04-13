@@ -56,6 +56,52 @@ export function getLatestSnapshot(trackedItemId: number, platform: string): Reco
   return row ?? null;
 }
 
+/** Get the latest row from a range-specific table (daily, weekly, monthly, or hourly). */
+export function getLatestForRange(trackedItemId: number, platform: string, range: string): Record<string, any> | null {
+  const tables = RANGE_TABLES[range];
+  if (!tables) return null;
+  const table = tables[platform];
+  if (!table) return null;
+  const dateCol = range === 'hourly' ? 'collected_at' : 'period_start';
+  const row = db.prepare(
+    `SELECT * FROM ${table} WHERE tracked_item_id = ? ORDER BY ${dateCol} DESC LIMIT 1`
+  ).get(trackedItemId) as Record<string, any> | undefined;
+  return row ?? null;
+}
+
+/** Get the two most recent rows from a range-specific table for velocity. */
+export function getRangePair(trackedItemId: number, platform: string, range: string): { today: Record<string, any> | null; yesterday: Record<string, any> | null } {
+  const tables = RANGE_TABLES[range];
+  if (!tables) return { today: null, yesterday: null };
+  const table = tables[platform];
+  if (!table) return { today: null, yesterday: null };
+  const dateCol = range === 'hourly' ? 'collected_at' : 'period_start';
+  const rows = db.prepare(
+    `SELECT * FROM ${table} WHERE tracked_item_id = ? ORDER BY ${dateCol} DESC LIMIT 2`
+  ).all(trackedItemId) as Record<string, any>[];
+  return { today: rows[0] ?? null, yesterday: rows[1] ?? null };
+}
+
+/** Get the most recent daily row (yesterday or earlier) for velocity comparison. */
+export function getPreviousDaily(trackedItemId: number, platform: string): Record<string, any> | null {
+  const table = DAILY_TABLES[platform];
+  if (!table) return null;
+  const row = db.prepare(
+    `SELECT * FROM ${table} WHERE tracked_item_id = ? ORDER BY period_start DESC LIMIT 1`
+  ).get(trackedItemId) as Record<string, any> | undefined;
+  return row ?? null;
+}
+
+/** Get the second-most-recent daily row for day-over-day delta. */
+export function getPreviousDailyPair(trackedItemId: number, platform: string): { today: Record<string, any> | null; yesterday: Record<string, any> | null } {
+  const table = DAILY_TABLES[platform];
+  if (!table) return { today: null, yesterday: null };
+  const rows = db.prepare(
+    `SELECT * FROM ${table} WHERE tracked_item_id = ? ORDER BY period_start DESC LIMIT 2`
+  ).all(trackedItemId) as Record<string, any>[];
+  return { today: rows[0] ?? null, yesterday: rows[1] ?? null };
+}
+
 export function getInterestHistory(trackedItemId: number, platform: string, days: number = 7, range: string = 'daily'): number[] {
   const rangeTables = RANGE_TABLES[range] || DAILY_TABLES;
   const table = rangeTables[platform];
@@ -100,6 +146,27 @@ export function getInterestHistory(trackedItemId: number, platform: string, days
   while (scores.length < days) {
     scores.unshift(0);
   }
+  return scores;
+}
+
+/** Get 7-day history for a specific lane (reach, interest, or engagement). */
+export function getLaneHistory(trackedItemId: number, platform: string, lane: 'reach' | 'interest' | 'engagement', days: number = 7, range: string = 'daily'): number[] {
+  const rangeTables = RANGE_TABLES[range] || DAILY_TABLES;
+  const table = rangeTables[platform];
+  if (!table) return new Array(days).fill(0);
+
+  const dateCol = range === 'hourly' ? 'collected_at' : 'period_start';
+  const scoreCol = range === 'hourly' ? '0' : `${lane}_score`;
+
+  const rows = db.prepare(
+    `SELECT ${scoreCol} as score FROM ${table}
+     WHERE tracked_item_id = ?
+     ORDER BY ${dateCol} DESC
+     LIMIT ?`
+  ).all(trackedItemId, days) as Array<{ score: number }>;
+
+  const scores = rows.map(r => r.score ?? 0).reverse();
+  while (scores.length < days) scores.unshift(0);
   return scores;
 }
 

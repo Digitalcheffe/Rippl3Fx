@@ -1,6 +1,6 @@
 import db from '../connection';
 
-// GitHub daily rollup — stars/forks/open_issues: MAX (cumulative), traffic/clones: SUM (incremental)
+// GitHub daily rollup — all metrics use MAX (snapshots store cumulative totals from the API)
 export function insertGithubDaily(trackedItemId: number, date: string): void {
   db.prepare(`
     INSERT OR IGNORE INTO github_daily
@@ -10,13 +10,13 @@ export function insertGithubDaily(trackedItemId: number, date: string): void {
       MAX(stars),
       MAX(forks),
       MAX(open_issues),
-      SUM(traffic_views),
-      SUM(traffic_uniques),
-      SUM(clones),
-      SUM(clones_uniques),
-      COALESCE(SUM(traffic_views), 0) + COALESCE(SUM(traffic_uniques), 0),
+      MAX(traffic_views),
+      MAX(traffic_uniques),
+      MAX(clones),
+      MAX(clones_uniques),
+      COALESCE(MAX(traffic_views), 0) + COALESCE(MAX(traffic_uniques), 0),
       0,
-      COALESCE(MAX(forks), 0) + COALESCE(SUM(clones), 0) + COALESCE(SUM(clones_uniques), 0),
+      COALESCE(MAX(forks), 0) + COALESCE(MAX(clones), 0) + COALESCE(MAX(clones_uniques), 0),
       ?, ?
     FROM github_snapshots
     WHERE tracked_item_id = ?
@@ -97,9 +97,9 @@ export function insertGithubWeekly(trackedItemId: number, periodStart: string, p
   db.prepare(`
     INSERT OR IGNORE INTO github_weekly
       (tracked_item_id, stars, forks, open_issues, traffic_views, traffic_uniques, clones, clones_uniques, reach_score, interest_score, engagement_score, period_start, period_end)
-    SELECT tracked_item_id, MAX(stars), MAX(forks), MAX(open_issues), SUM(traffic_views), SUM(traffic_uniques), SUM(clones), SUM(clones_uniques),
-      COALESCE(SUM(traffic_views), 0) + COALESCE(SUM(traffic_uniques), 0), 0,
-      COALESCE(MAX(forks), 0) + COALESCE(SUM(clones), 0) + COALESCE(SUM(clones_uniques), 0),
+    SELECT tracked_item_id, MAX(stars), MAX(forks), MAX(open_issues), MAX(traffic_views), MAX(traffic_uniques), MAX(clones), MAX(clones_uniques),
+      COALESCE(MAX(traffic_views), 0) + COALESCE(MAX(traffic_uniques), 0), 0,
+      COALESCE(MAX(forks), 0) + COALESCE(MAX(clones), 0) + COALESCE(MAX(clones_uniques), 0),
       ?, ?
     FROM github_daily WHERE tracked_item_id = ? AND period_start BETWEEN ? AND ? GROUP BY tracked_item_id
   `).run(periodStart, periodEnd, trackedItemId, periodStart, periodEnd);
@@ -144,9 +144,9 @@ export function insertGithubMonthly(trackedItemId: number, periodStart: string, 
   db.prepare(`
     INSERT OR IGNORE INTO github_monthly
       (tracked_item_id, stars, forks, open_issues, traffic_views, traffic_uniques, clones, clones_uniques, reach_score, interest_score, engagement_score, period_start, period_end)
-    SELECT tracked_item_id, MAX(stars), MAX(forks), MAX(open_issues), SUM(traffic_views), SUM(traffic_uniques), SUM(clones), SUM(clones_uniques),
-      COALESCE(SUM(traffic_views), 0) + COALESCE(SUM(traffic_uniques), 0), 0,
-      COALESCE(MAX(forks), 0) + COALESCE(SUM(clones), 0) + COALESCE(SUM(clones_uniques), 0),
+    SELECT tracked_item_id, MAX(stars), MAX(forks), MAX(open_issues), MAX(traffic_views), MAX(traffic_uniques), MAX(clones), MAX(clones_uniques),
+      COALESCE(MAX(traffic_views), 0) + COALESCE(MAX(traffic_uniques), 0), 0,
+      COALESCE(MAX(forks), 0) + COALESCE(MAX(clones), 0) + COALESCE(MAX(clones_uniques), 0),
       ?, ?
     FROM github_daily WHERE tracked_item_id = ? AND period_start BETWEEN ? AND ? GROUP BY tracked_item_id
   `).run(periodStart, periodEnd, trackedItemId, periodStart, periodEnd);
