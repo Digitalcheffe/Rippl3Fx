@@ -59,7 +59,7 @@ export default function Settings() {
 
   return (
     <div>
-      <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Settings</div>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Settings</div>
       <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font, marginBottom: 20 }}>Settings</h1>
 
       <div style={{ background: C.bgCard, border: `1px solid ${C.borderMid}`, borderRadius: 14, overflow: 'hidden' }}>
@@ -271,6 +271,7 @@ function AccountsTab() {
   const [expandedAccount, setExpandedAccount] = useState<number | null>(null);
   const [accountItems, setAccountItems] = useState<Array<{ id: number; display_name: string; platform_identifier: string }>>([]);
   const [backfillingId, setBackfillingId] = useState<number | null>(null);
+  const [confirmDeleteAccountId, setConfirmDeleteAccountId] = useState<number | null>(null);
 
   const loadAccounts = async () => {
     try {
@@ -327,8 +328,8 @@ function AccountsTab() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Permanently delete this account? All items and metric data will be purged. This cannot be undone.')) return;
     await apiDelete(`/accounts/${id}`);
+    setConfirmDeleteAccountId(null);
     loadAccounts();
   };
 
@@ -357,7 +358,15 @@ function AccountsTab() {
                 ) : (
                   <button onClick={() => handleReactivate(a.id)} style={{ padding: '4px 10px', background: C.up + '15', border: `1px solid ${C.up}55`, borderRadius: 5, color: C.up, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: font }}>Reactivate</button>
                 )}
-                <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Delete</button>
+                {confirmDeleteAccountId === a.id ? (
+                  <>
+                    <span style={{ fontSize: 11, color: '#c00', fontFamily: font, fontWeight: 700 }}>Permanently delete?</span>
+                    <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 8px', background: '#e8380d', border: 'none', borderRadius: 5, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: font }}>Yes</button>
+                    <button onClick={() => setConfirmDeleteAccountId(null)} style={{ padding: '4px 8px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, color: C.textMid, fontSize: 11, cursor: 'pointer', fontFamily: font }}>No</button>
+                  </>
+                ) : (
+                  <button onClick={() => setConfirmDeleteAccountId(a.id)} style={{ padding: '4px 10px', background: 'none', border: '1px solid #e8380d55', borderRadius: 5, color: '#e8380d', fontSize: 11, cursor: 'pointer', fontFamily: font }}>Delete</button>
+                )}
               </div>
             </div>
             {isExpanded && (
@@ -637,7 +646,7 @@ function TrackedItemsTab() {
                   )}
                   {confirmDeleteId === item.id ? (
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <span style={{ fontSize: 9, color: '#c00', fontFamily: font }}>Permanently delete?</span>
+                      <span style={{ fontSize: 11, color: '#c00', fontFamily: font, fontWeight: 700 }}>Permanently delete?</span>
                       <button onClick={() => handleDelete(item.id)} style={{
                         padding: '4px 8px', background: '#e8380d', border: 'none',
                         borderRadius: 5, color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: font,

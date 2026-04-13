@@ -11,7 +11,7 @@ export async function collectGithub(item: TrackedItem, credentials: GithubCreden
   const octokit = new Octokit({ auth: credentials.personalAccessToken });
 
   try {
-    // Repo stats — stars, forks, open_issues
+    // Repo stats — stars, forks, open_issues, watchers (subscribers_count)
     const { data: repoData } = await octokit.repos.get({ owner, repo });
 
     // Traffic views (requires push access, may 403)
@@ -36,15 +36,30 @@ export async function collectGithub(item: TrackedItem, credentials: GithubCreden
       console.warn(`[GitHub] Clones unavailable for ${item.platform_identifier}: ${err.status || err.message}`);
     }
 
+    // Release downloads — sum all asset download_counts across all releases
+    let releaseDownloads = 0;
+    try {
+      const { data: releases } = await octokit.repos.listReleases({ owner, repo, per_page: 100 });
+      for (const release of releases) {
+        for (const asset of release.assets || []) {
+          releaseDownloads += asset.download_count || 0;
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[GitHub] Releases unavailable for ${item.platform_identifier}: ${err.status || err.message}`);
+    }
+
     insertGithubSnapshot({
       tracked_item_id: item.id,
       stars: repoData.stargazers_count,
       forks: repoData.forks_count,
       open_issues: repoData.open_issues_count,
+      watchers: repoData.subscribers_count ?? 0,
       traffic_views: trafficViews,
       traffic_uniques: trafficUniques,
       clones: cloneCount,
       clones_uniques: cloneUniques,
+      release_downloads: releaseDownloads,
     });
 
     console.log(`[GitHub] Collected snapshot for ${item.platform_identifier}`);

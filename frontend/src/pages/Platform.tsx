@@ -176,7 +176,7 @@ export default function Platform() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
+          <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>{name}</h1>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -190,6 +190,15 @@ export default function Platform() {
               }}>{range}</button>
             ))}
           </div>
+          <button onClick={handlePollNow} disabled={polling} style={{
+            padding: '5px 12px', background: C.up + '15',
+            border: `1px solid ${C.up}55`, borderRadius: 6,
+            color: C.up, fontSize: 10, fontWeight: 700,
+            cursor: polling ? 'wait' : 'pointer', fontFamily: font,
+            opacity: polling ? 0.6 : 1, textTransform: 'uppercase',
+          }}>
+            {polling ? 'Polling...' : 'Poll Now'}
+          </button>
           <LaneInfoButton onClick={() => setShowInfo(!showInfo)} />
         </div>
       </div>
@@ -217,9 +226,6 @@ export default function Platform() {
             </div>
           )}
 
-          {/* Account Overview */}
-          {activeAccountId && <AccountStats accountId={activeAccountId} platform={name} />}
-
           {/* Platform-level lanes + performance */}
           {laneSummaryItems.length > 0 && (
             <>
@@ -231,6 +237,7 @@ export default function Platform() {
                 onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
                 timeLabel={{ hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[timeRange]}
                 platform={platform}
+                peaks={platformData?.peaks}
               />
               <div style={{
                 maxHeight: activeChart ? 400 : 0,
@@ -240,42 +247,28 @@ export default function Platform() {
                 marginBottom: activeChart ? 20 : 0,
               }}>
                 {activeChart === 'Performance' ? (
-                  <PerformanceTrend items={dashboardItems} platform={name} onClose={() => setActiveChart(null)} />
+                  <PerformanceTrend items={dashboardItems} platform={name} onClose={() => setActiveChart(null)} range={timeRange} />
                 ) : activeChart ? (
                   <LayeredInterestChart
                     items={dashboardItems}
                     lane={activeChart}
                     onClose={() => setActiveChart(null)}
+                    range={timeRange}
                   />
                 ) : null}
               </div>
             </>
           )}
 
-          {/* Discovery Panel */}
-          {activeAccountId && (
-            <DiscoveryPanel
-              accountId={activeAccountId}
-              platform={name}
-              onItemTracked={() => {
-                if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
-              }}
-            />
-          )}
+          {/* Two-column layout: content left, account overview right */}
+          <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 16 }}>
+            {/* Left column: tracked items + discoverable */}
+            <div>
 
           {/* Tracked items header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', fontFamily: font }}>Tracked Items</div>
+            <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', fontFamily: font }}>Tracked Items</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handlePollNow} disabled={polling} style={{
-                padding: '4px 12px', background: C.up + '15',
-                border: `1px solid ${C.up}40`, borderRadius: 5,
-                color: C.up, fontSize: 11, fontWeight: 700,
-                cursor: polling ? 'wait' : 'pointer', fontFamily: font,
-                opacity: polling ? 0.6 : 1,
-              }}>
-                {polling ? 'Polling...' : 'Poll Now'}
-              </button>
               <button onClick={() => setShowAddItem(!showAddItem)} style={{
                 padding: '4px 12px', background: platformColor + '15',
                 border: `1px solid ${platformColor}40`, borderRadius: 5,
@@ -407,6 +400,24 @@ export default function Platform() {
               </>
             );
           })()}
+
+              {/* Discovery Panel */}
+              {activeAccountId && (
+                <DiscoveryPanel
+                  accountId={activeAccountId}
+                  platform={name}
+                  onItemTracked={() => {
+                    if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Right column: Account Overview */}
+            <div>
+              {activeAccountId && <AccountStats accountId={activeAccountId} platform={name} />}
+            </div>
+          </div>
         </div>
       )}
     </div>

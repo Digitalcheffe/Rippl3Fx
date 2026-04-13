@@ -31,13 +31,13 @@ export default function AccountStats({ accountId, platform }: AccountStatsProps)
   if (loading || stats.length === 0) return null;
 
   return (
-    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 18px', marginBottom: 16, boxShadow: '0 2px 8px rgba(30,58,95,0.06)' }}>
-      <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', fontFamily: font, marginBottom: 10 }}>Account Overview</div>
-      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 18px', boxShadow: '0 2px 8px rgba(30,58,95,0.06)', position: 'sticky', top: 20 }}>
+      <div style={{ fontSize: 11, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', fontFamily: font, marginBottom: 14 }}>Account Overview</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {stats.map(s => (
           <div key={s.label}>
-            <div style={{ fontSize: 9, color: C.textFaint, textTransform: 'uppercase', letterSpacing: 1, fontFamily: font }}>{s.label}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: platformColor, fontFamily: font, lineHeight: 1.3 }}>{s.value}</div>
+            <div style={{ fontSize: 10, color: C.textFaint, textTransform: 'uppercase', letterSpacing: 1, fontFamily: font, marginBottom: 2 }}>{s.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: platformColor, fontFamily: font, lineHeight: 1.2 }}>{s.value}</div>
           </div>
         ))}
       </div>

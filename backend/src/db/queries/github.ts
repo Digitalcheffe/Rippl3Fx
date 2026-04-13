@@ -5,18 +5,20 @@ export interface GithubSnapshotInsert {
   stars: number | null;
   forks: number | null;
   open_issues: number | null;
+  watchers: number | null;
   traffic_views: number | null;
   traffic_uniques: number | null;
   clones: number | null;
   clones_uniques: number | null;
+  release_downloads: number | null;
 }
 
 export function insertGithubSnapshot(data: GithubSnapshotInsert): void {
   db.prepare(`
     INSERT INTO github_snapshots
-      (tracked_item_id, stars, forks, open_issues, traffic_views, traffic_uniques, clones, clones_uniques)
+      (tracked_item_id, stars, forks, open_issues, watchers, traffic_views, traffic_uniques, clones, clones_uniques, release_downloads)
     VALUES
-      (@tracked_item_id, @stars, @forks, @open_issues, @traffic_views, @traffic_uniques, @clones, @clones_uniques)
+      (@tracked_item_id, @stars, @forks, @open_issues, @watchers, @traffic_views, @traffic_uniques, @clones, @clones_uniques, @release_downloads)
   `).run(data);
 }
 

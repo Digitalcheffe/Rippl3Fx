@@ -5,9 +5,9 @@ const font = "'DM Mono', monospace";
 
 export const LANE_DEFINITIONS: Record<string, Record<string, { metrics: string; description: string }>> = {
   github: {
-    Reach: { metrics: 'Traffic Views + Traffic Uniques', description: 'How many people saw your repo pages (requires push access)' },
-    Interest: { metrics: 'Stars + Forks', description: 'How many people showed interest in your project' },
-    Engagement: { metrics: 'Clones + Clone Uniques', description: 'How many people actively pulled your code' },
+    Reach: { metrics: 'Traffic Views', description: 'How many people saw your repo pages (requires push access)' },
+    Interest: { metrics: 'Stars + Watchers', description: 'How many people starred or subscribed to your project' },
+    Engagement: { metrics: 'Forks + Clones + Release Downloads', description: 'How many people forked, cloned, or downloaded releases' },
     Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
   },
   ga4: {
@@ -23,9 +23,9 @@ export const LANE_DEFINITIONS: Record<string, Record<string, { metrics: string; 
     Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
   },
   all: {
-    Reach: { metrics: 'Combined across platforms', description: 'GitHub traffic + GA4 pageviews + Bing impressions' },
-    Interest: { metrics: 'Combined across platforms', description: 'GitHub stars/forks + GA4 users + Bing clicks' },
-    Engagement: { metrics: 'Combined across platforms', description: 'GitHub clones + GA4 sessions + Bing CTR' },
+    Reach: { metrics: 'Combined across platforms', description: 'GitHub traffic views + GA4 pageviews + Bing impressions' },
+    Interest: { metrics: 'Combined across platforms', description: 'GitHub stars/watchers + GA4 users + Bing clicks' },
+    Engagement: { metrics: 'Combined across platforms', description: 'GitHub forks/clones/downloads + GA4 sessions + Bing CTR' },
     Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
   },
 };
@@ -42,7 +42,7 @@ export function LaneTooltip({ lane, platform }: { lane: string; platform?: strin
       <span
         onMouseEnter={() => setShow(true)}
         onMouseLeave={() => setShow(false)}
-        style={{ fontSize: 9, color: C.textFaint, cursor: 'help', opacity: 0.6 }}
+        style={{ fontSize: 11, color: C.textFaint, cursor: 'help', opacity: 0.8 }}
       >?</span>
       {show && (
         <div style={{
@@ -52,7 +52,7 @@ export function LaneTooltip({ lane, platform }: { lane: string; platform?: strin
           boxShadow: '0 4px 16px rgba(13,31,53,0.3)',
         }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: C.text, fontFamily: font, marginBottom: 3 }}>{info.metrics}</div>
-          <div style={{ fontSize: 9, color: C.textSoft, fontFamily: font, lineHeight: 1.4 }}>{info.description}</div>
+          <div style={{ fontSize: 10, color: C.textSoft, fontFamily: font, lineHeight: 1.4 }}>{info.description}</div>
         </div>
       )}
     </span>
@@ -91,9 +91,9 @@ export function LaneInfoPanel({ platform, onClose }: { platform?: string; onClos
                 const laneColor = lane === 'Performance' ? C.accent : (C[lane as keyof typeof C] || C.textMid) as string;
                 return (
                   <div key={lane} style={{ padding: '6px 8px', background: C.bg, borderRadius: 6, borderTop: `2px solid ${laneColor}` }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: laneColor, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{lane}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: laneColor, fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{lane}</div>
                     <div style={{ fontSize: 10, fontWeight: 600, color: C.text, fontFamily: font, marginBottom: 2 }}>{info.metrics}</div>
-                    <div style={{ fontSize: 8, color: C.textFaint, fontFamily: font, lineHeight: 1.3 }}>{info.description}</div>
+                    <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font, lineHeight: 1.3 }}>{info.description}</div>
                   </div>
                 );
               })}

@@ -17,9 +17,9 @@ export function mapToLanes(platform: string, row: Record<string, any>): LaneValu
   switch (platform) {
     case 'github':
       return {
-        reach: (row.traffic_views ?? 0) + (row.traffic_uniques ?? 0),
-        interest: (row.stars ?? 0) + (row.forks ?? 0),
-        engagement: (row.clones ?? 0) + (row.clones_uniques ?? 0),
+        reach: row.traffic_views ?? 0,
+        interest: (row.stars ?? 0) + (row.watchers ?? 0),
+        engagement: (row.forks ?? 0) + (row.clones ?? 0) + (row.release_downloads ?? 0),
       };
     case 'ga4':
       return {
@@ -64,6 +64,9 @@ export function writeTrackedMetric(
       engagement_value = excluded.engagement_value,
       performance_score = excluded.performance_score
   `).run(trackedItemId, platform, periodType, periodStart, periodEnd, lanes.reach, lanes.interest, lanes.engagement, perf);
+
+  // Update item-level peaks
+  updatePeaks(trackedItemId, platform, periodType, periodStart, lanes);
 }
 
 /** Recalculate and write unified_metrics (platform-level) by summing all tracked_metrics for that platform + period. */
@@ -89,10 +92,64 @@ export function refreshUnifiedMetric(platform: string, periodType: string, perio
       engagement_value = excluded.engagement_value,
       performance_score = excluded.performance_score
   `).run(platform, periodType, periodStart, periodEnd, lanes.reach, lanes.interest, lanes.engagement, perf);
+
+  // Update platform-level peaks (tracked_item_id = null)
+  updatePeaks(null, platform, periodType, periodStart, lanes);
+}
+
+/** Update peak_metrics if any lane value exceeds the stored peak. */
+export function updatePeaks(trackedItemId: number | null, platform: string, periodType: string, periodStart: string, lanes: LaneValues): void {
+  // Skip hourly — peaks only tracked for daily/weekly/monthly
+  if (periodType === 'hourly') return;
+
+  const existing = db.prepare(
+    'SELECT * FROM peak_metrics WHERE tracked_item_id IS ? AND platform = ? AND period_type = ?'
+  ).get(trackedItemId, platform, periodType) as Record<string, any> | undefined;
+
+  if (!existing) {
+    // First entry — insert
+    db.prepare(`
+      INSERT INTO peak_metrics (tracked_item_id, platform, period_type, reach_peak, interest_peak, engagement_peak, reach_peak_date, interest_peak_date, engagement_peak_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(trackedItemId, platform, periodType, lanes.reach, lanes.interest, lanes.engagement, periodStart, periodStart, periodStart);
+    return;
+  }
+
+  // Update only if new value exceeds stored peak
+  const updates: string[] = [];
+  const params: any[] = [];
+
+  if (lanes.reach > (existing.reach_peak ?? 0)) {
+    updates.push('reach_peak = ?, reach_peak_date = ?');
+    params.push(lanes.reach, periodStart);
+  }
+  if (lanes.interest > (existing.interest_peak ?? 0)) {
+    updates.push('interest_peak = ?, interest_peak_date = ?');
+    params.push(lanes.interest, periodStart);
+  }
+  if (lanes.engagement > (existing.engagement_peak ?? 0)) {
+    updates.push('engagement_peak = ?, engagement_peak_date = ?');
+    params.push(lanes.engagement, periodStart);
+  }
+
+  if (updates.length > 0) {
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    db.prepare(
+      `UPDATE peak_metrics SET ${updates.join(', ')} WHERE tracked_item_id IS ? AND platform = ? AND period_type = ?`
+    ).run(...params, trackedItemId, platform, periodType);
+  }
+}
+
+/** Get peak values for an item or platform. */
+export function getPeaks(trackedItemId: number | null, platform: string, periodType: string): { reach_peak: number; interest_peak: number; engagement_peak: number; reach_peak_date: string | null; interest_peak_date: string | null; engagement_peak_date: string | null } | null {
+  const row = db.prepare(
+    'SELECT reach_peak, interest_peak, engagement_peak, reach_peak_date, interest_peak_date, engagement_peak_date FROM peak_metrics WHERE tracked_item_id IS ? AND platform = ? AND period_type = ?'
+  ).get(trackedItemId, platform, periodType) as any;
+  return row ?? null;
 }
 
 /**
- * Full write: map raw platform data → write tracked_metrics → refresh unified_metrics.
+ * Full write: map raw platform data → write tracked_metrics → refresh unified_metrics → update peaks.
  * Call this after any snapshot or rollup insert.
  */
 export function writeMetrics(

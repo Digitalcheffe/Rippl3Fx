@@ -168,10 +168,42 @@ router.get('/:id/stats', async (req: Request, res: Response) => {
         const { data: repos } = await octokit.repos.listForAuthenticatedUser({ per_page: 100, type: 'owner' });
         const totalStars = repos.reduce((s, r) => s + (r.stargazers_count || 0), 0);
         const totalForks = repos.reduce((s, r) => s + (r.forks_count || 0), 0);
+        const totalWatchers = repos.reduce((s, r) => s + ((r as any).subscribers_count || 0), 0);
+
+        // Aggregate from tracked item snapshots for traffic/clones/releases
+        const ghTotals = db.prepare(`
+          SELECT MAX(traffic_views) as traffic_views, MAX(clones) as clones, MAX(release_downloads) as release_downloads
+          FROM github_snapshots gs
+          JOIN tracked_items ti ON gs.tracked_item_id = ti.id
+          WHERE ti.metric_account_id = ?
+        `).get(id) as any;
+
+        // Count releases across tracked repos
+        let totalReleases = 0;
+        try {
+          const trackedRepos = db.prepare('SELECT platform_identifier FROM tracked_items WHERE metric_account_id = ? AND is_active = 1').all(id) as Array<{ platform_identifier: string }>;
+          for (const tr of trackedRepos) {
+            const [owner, repo] = tr.platform_identifier.split('/');
+            if (owner && repo) {
+              try {
+                const { data: releases } = await octokit.repos.listReleases({ owner, repo, per_page: 1 });
+                const { headers } = await octokit.repos.listReleases({ owner, repo, per_page: 1 });
+                // Parse link header for total count, or just count from first page
+                const releaseCount = await octokit.repos.listReleases({ owner, repo, per_page: 100 });
+                totalReleases += releaseCount.data.length;
+              } catch { /* ignore */ }
+            }
+          }
+        } catch { /* ignore */ }
+
         stats = [
+          { label: 'Traffic Views', value: fmtNum(ghTotals?.traffic_views || 0) },
           { label: 'Total Stars', value: fmtNum(totalStars) },
+          { label: 'Watchers', value: fmtNum(totalWatchers) },
           { label: 'Total Forks', value: fmtNum(totalForks) },
-          { label: 'Followers', value: fmtNum(user.followers) },
+          { label: 'Clones', value: fmtNum(ghTotals?.clones || 0) },
+          { label: 'Release Downloads', value: fmtNum(ghTotals?.release_downloads || 0) },
+          { label: 'Releases', value: fmtNum(totalReleases) },
           { label: 'Public Repos', value: fmtNum(user.public_repos) },
         ];
         break;

@@ -33,9 +33,10 @@ interface Props {
   onCardClick?: (lane: string) => void;
   timeLabel?: string;
   platform?: string;
+  peaks?: { reach_peak: number; interest_peak: number; engagement_peak: number } | null;
 }
 
-export default function LaneSummary({ items, performanceScore, performanceVelocity, weights, activeCard, onCardClick, timeLabel = 'today', platform }: Props) {
+export default function LaneSummary({ items, performanceScore, performanceVelocity, weights, activeCard, onCardClick, timeLabel = 'today', platform, peaks }: Props) {
   const totals: Record<string, LaneData> = {};
   for (const lane of LANES) {
     totals[lane] = {
@@ -65,10 +66,33 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
             cursor: onCardClick ? 'pointer' : 'default',
             transition: 'all 0.2s ease',
           }}>
-            <div style={{ fontSize: 10, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>{lane}<LaneTooltip lane={lane} platform={platform} /></div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
-            <div style={{ fontSize: 11, color: vc, fontWeight: 700, fontFamily: font, marginTop: 4 }}>
-              {d.velocity !== 0 ? `${velArrow(d.velocity)} ${velSign(d.velocity)}${fmt(Math.abs(d.velocity))} ${timeLabel}` : 'No change yet'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontWeight: 700, fontFamily: font }}>{lane}<LaneTooltip lane={lane} platform={platform} /></div>
+              {peaks && (() => {
+                const peakKey = `${lane.toLowerCase()}_peak` as keyof typeof peaks;
+                const peakVal = peaks[peakKey] as number;
+                return peakVal > 0 ? (
+                  <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>Peak: {fmt(peakVal)}</div>
+                ) : null;
+              })()}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <div style={{ fontSize: 12, color: C.textMid, fontFamily: font, textTransform: 'capitalize' }}>{timeLabel}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>Change</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: d.velocity !== 0 ? vc : C.textFaint, fontFamily: font, lineHeight: 1 }}>
+                  {d.velocity !== 0 ? `${velSign(d.velocity)}${fmt(Math.abs(d.velocity))}` : '0'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <div style={{ fontSize: 12, color: C.textMid, fontFamily: font }}>% Change</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: d.velocity !== 0 ? vc : C.textFaint, fontFamily: font, lineHeight: 1 }}>
+                  {(() => { if (d.velocity === 0) return '0%'; const prev = d.current - d.velocity; return prev !== 0 ? `${d.velocity > 0 ? '+' : ''}${((d.velocity / prev) * 100).toFixed(1)}%` : 'new'; })()}
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -94,7 +118,7 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
             {pv !== 0 ? `${velArrow(pv)} ${velSign(pv)}${Math.abs(pv).toFixed(1)} ${timeLabel}` : 'No change yet'}
           </div>
           {weights && (
-            <div style={{ fontSize: 8, color: C.textFaint, fontFamily: font, marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font, marginTop: 4 }}>
               R {Math.round(weights.reach * 100)}% · I {Math.round(weights.interest * 100)}% · E {Math.round(weights.engagement * 100)}%
             </div>
           )}
