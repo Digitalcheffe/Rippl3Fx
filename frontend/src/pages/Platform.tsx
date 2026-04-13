@@ -217,9 +217,6 @@ export default function Platform() {
             </div>
           )}
 
-          {/* Account Overview */}
-          {activeAccountId && <AccountStats accountId={activeAccountId} platform={name} />}
-
           {/* Platform-level lanes + performance */}
           {laneSummaryItems.length > 0 && (
             <>
@@ -252,16 +249,10 @@ export default function Platform() {
             </>
           )}
 
-          {/* Discovery Panel */}
-          {activeAccountId && (
-            <DiscoveryPanel
-              accountId={activeAccountId}
-              platform={name}
-              onItemTracked={() => {
-                if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
-              }}
-            />
-          )}
+          {/* Two-column layout: content left, account overview right */}
+          <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 16 }}>
+            {/* Left column: tracked items + discoverable */}
+            <div>
 
           {/* Tracked items header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -407,6 +398,24 @@ export default function Platform() {
               </>
             );
           })()}
+
+              {/* Discovery Panel */}
+              {activeAccountId && (
+                <DiscoveryPanel
+                  accountId={activeAccountId}
+                  platform={name}
+                  onItemTracked={() => {
+                    if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Right column: Account Overview */}
+            <div>
+              {activeAccountId && <AccountStats accountId={activeAccountId} platform={name} />}
+            </div>
+          </div>
         </div>
       )}
     </div>
