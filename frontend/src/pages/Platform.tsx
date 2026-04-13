@@ -10,6 +10,7 @@ import LaneSummary from '../components/LaneSummary';
 import PerformanceTrend from '../components/PerformanceTrend';
 import LayeredInterestChart from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
+import { LaneInfoButton, LaneInfoPanel } from '../components/LaneInfo';
 
 const font = "'DM Mono', monospace";
 
@@ -70,6 +71,7 @@ export default function Platform() {
   const [dashboardItems, setDashboardItems] = useState<any[]>([]);
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [activeChart, setActiveChart] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   // Load accounts for this platform
   useEffect(() => {
@@ -177,17 +179,22 @@ export default function Platform() {
           <div style={{ fontSize: 10, letterSpacing: 3, color: C.textFaint, textTransform: 'uppercase', marginBottom: 5, fontFamily: font }}>Platform</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: C.text, letterSpacing: -0.5, fontFamily: font }}>{name}</h1>
         </div>
-        <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 8, padding: 2 }}>
-          {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
-            <button key={range} onClick={() => setTimeRange(range)} style={{
-              padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
-              border: 'none', color: timeRange === range ? '#fff' : C.textMid,
-              fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
-              borderRadius: 6, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
-            }}>{range}</button>
-          ))}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 2, background: C.bgInput, borderRadius: 8, padding: 2 }}>
+            {(['hourly', 'daily', 'weekly', 'monthly'] as const).map(range => (
+              <button key={range} onClick={() => setTimeRange(range)} style={{
+                padding: '5px 12px', background: timeRange === range ? C.accent : 'transparent',
+                border: 'none', color: timeRange === range ? '#fff' : C.textMid,
+                fontSize: 10, fontWeight: timeRange === range ? 700 : 400,
+                borderRadius: 6, cursor: 'pointer', fontFamily: font, textTransform: 'uppercase',
+              }}>{range}</button>
+            ))}
+          </div>
+          <LaneInfoButton onClick={() => setShowInfo(!showInfo)} />
         </div>
       </div>
+
+      {showInfo && <LaneInfoPanel platform={name} onClose={() => setShowInfo(false)} />}
 
       {accounts.length === 0 ? (
         <EmptyState platform={name} />
@@ -223,6 +230,7 @@ export default function Platform() {
                 activeCard={activeChart}
                 onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
                 timeLabel={{ hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[timeRange]}
+                platform={platform}
               />
               <div style={{
                 maxHeight: activeChart ? 400 : 0,

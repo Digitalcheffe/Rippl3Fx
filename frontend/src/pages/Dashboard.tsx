@@ -7,6 +7,7 @@ import PerformanceTrend from '../components/PerformanceTrend';
 import LayeredInterestChart from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
 import SkeletonCard from '../components/SkeletonCard';
+import { LaneInfoButton, LaneInfoPanel } from '../components/LaneInfo';
 
 const font = "'DM Mono', monospace";
 
@@ -70,6 +71,7 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -167,9 +169,12 @@ export default function Dashboard() {
                 cursor: 'pointer', fontFamily: font, textTransform: 'uppercase', letterSpacing: 0.5,
               }}>{range}</button>
             ))}
+          <LaneInfoButton onClick={() => setShowInfo(!showInfo)} />
           </div>
         </div>
       </div>
+
+      {showInfo && <LaneInfoPanel onClose={() => setShowInfo(false)} />}
 
       {loading ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>

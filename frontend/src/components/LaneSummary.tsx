@@ -1,4 +1,5 @@
 import { C } from '../theme';
+import { LaneTooltip } from './LaneInfo';
 
 const font = "'DM Mono', monospace";
 
@@ -31,9 +32,10 @@ interface Props {
   activeCard?: string | null;
   onCardClick?: (lane: string) => void;
   timeLabel?: string;
+  platform?: string;
 }
 
-export default function LaneSummary({ items, performanceScore, performanceVelocity, weights, activeCard, onCardClick, timeLabel = 'today' }: Props) {
+export default function LaneSummary({ items, performanceScore, performanceVelocity, weights, activeCard, onCardClick, timeLabel = 'today', platform }: Props) {
   const totals: Record<string, LaneData> = {};
   for (const lane of LANES) {
     totals[lane] = {
@@ -63,7 +65,7 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
             cursor: onCardClick ? 'pointer' : 'default',
             transition: 'all 0.2s ease',
           }}>
-            <div style={{ fontSize: 10, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>{lane}</div>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>{lane}<LaneTooltip lane={lane} platform={platform} /></div>
             <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
             <div style={{ fontSize: 11, color: vc, fontWeight: 700, fontFamily: font, marginTop: 4 }}>
               {d.velocity !== 0 ? `${velArrow(d.velocity)} ${velSign(d.velocity)}${fmt(Math.abs(d.velocity))} ${timeLabel}` : 'No change yet'}
@@ -86,7 +88,7 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
           cursor: onCardClick ? 'pointer' : 'default',
           transition: 'all 0.2s ease',
         }}>
-          <div style={{ fontSize: 10, letterSpacing: 2, color: C.accent, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>Performance</div>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: C.accent, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>Performance<LaneTooltip lane="Performance" platform={platform} /></div>
           <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{performanceScore.toFixed(1)}%</div>
           <div style={{ fontSize: 11, color: velColor(pv), fontWeight: 700, fontFamily: font, marginTop: 4 }}>
             {pv !== 0 ? `${velArrow(pv)} ${velSign(pv)}${Math.abs(pv).toFixed(1)} ${timeLabel}` : 'No change yet'}
