@@ -17,9 +17,9 @@ export function mapToLanes(platform: string, row: Record<string, any>): LaneValu
   switch (platform) {
     case 'github':
       return {
-        reach: (row.traffic_views ?? 0) + (row.traffic_uniques ?? 0),
-        interest: (row.stars ?? 0) + (row.forks ?? 0),
-        engagement: (row.clones ?? 0) + (row.clones_uniques ?? 0),
+        reach: row.traffic_views ?? 0,
+        interest: (row.stars ?? 0) + (row.watchers ?? 0),
+        engagement: (row.forks ?? 0) + (row.clones ?? 0) + (row.release_downloads ?? 0),
       };
     case 'ga4':
       return {

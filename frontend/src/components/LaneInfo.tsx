@@ -5,9 +5,9 @@ const font = "'DM Mono', monospace";
 
 export const LANE_DEFINITIONS: Record<string, Record<string, { metrics: string; description: string }>> = {
   github: {
-    Reach: { metrics: 'Traffic Views + Traffic Uniques', description: 'How many people saw your repo pages (requires push access)' },
-    Interest: { metrics: 'Stars + Forks', description: 'How many people showed interest in your project' },
-    Engagement: { metrics: 'Clones + Clone Uniques', description: 'How many people actively pulled your code' },
+    Reach: { metrics: 'Traffic Views', description: 'How many people saw your repo pages (requires push access)' },
+    Interest: { metrics: 'Stars + Watchers', description: 'How many people starred or subscribed to your project' },
+    Engagement: { metrics: 'Forks + Clones + Release Downloads', description: 'How many people forked, cloned, or downloaded releases' },
     Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
   },
   ga4: {
@@ -23,9 +23,9 @@ export const LANE_DEFINITIONS: Record<string, Record<string, { metrics: string; 
     Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
   },
   all: {
-    Reach: { metrics: 'Combined across platforms', description: 'GitHub traffic + GA4 pageviews + Bing impressions' },
-    Interest: { metrics: 'Combined across platforms', description: 'GitHub stars/forks + GA4 users + Bing clicks' },
-    Engagement: { metrics: 'Combined across platforms', description: 'GitHub clones + GA4 sessions + Bing CTR' },
+    Reach: { metrics: 'Combined across platforms', description: 'GitHub traffic views + GA4 pageviews + Bing impressions' },
+    Interest: { metrics: 'Combined across platforms', description: 'GitHub stars/watchers + GA4 users + Bing clicks' },
+    Engagement: { metrics: 'Combined across platforms', description: 'GitHub forks/clones/downloads + GA4 sessions + Bing CTR' },
     Performance: { metrics: 'Weighted sum of lanes', description: '(Reach × R%) + (Interest × I%) + (Engagement × E%)' },
   },
 };
