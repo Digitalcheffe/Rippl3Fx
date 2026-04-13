@@ -66,7 +66,6 @@ export default function Platform() {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<TrackedItem | null>(null);
-  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [dashboardItems, setDashboardItems] = useState<any[]>([]);
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
@@ -154,16 +153,17 @@ export default function Platform() {
     }
   };
 
-  const handleToggleActive = async (item: TrackedItem) => {
-    await apiPut(`/items/${item.id}`, { is_active: item.is_active ? 0 : 1 });
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_active: i.is_active ? 0 : 1 } : i));
+  const handleUntrack = async (id: number) => {
+    await apiPost(`/items/${id}/untrack`);
+    if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
   };
 
-  const handleRemoveItem = async (id: number) => {
-    await apiDelete(`/items/${id}`);
-    setItems(prev => prev.filter(i => i.id !== id));
-    setConfirmRemoveId(null);
+  const handleRetrack = async (id: number) => {
+    await apiPost(`/items/${id}/retrack`, {});
+    if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
   };
+
+  const [showUntracked, setShowUntracked] = useState(false);
 
   // Tag removal handled via tag management UI
   void itemTags; // used in StatCard rendering
@@ -296,93 +296,108 @@ export default function Platform() {
             />
           )}
 
-          {/* Items list */}
-          {items.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: C.textSoft, fontSize: 13, fontFamily: font }}>
-              No tracked items yet. Click "+ Add Item" to start tracking.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
-              {items.map((item, i) => {
-                const dashItem = dashboardItems.find(d => d.id === item.id);
-                const statItem: StatCardItem = {
-                  id: item.id,
-                  platform: name,
-                  display_name: item.display_name,
-                  tags: (itemTags[item.id] || []).map(t => t.name),
-                  lanes: dashItem ? itemToLanes(dashItem) : {
-                    Reach: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
-                    Interest: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
-                    Engagement: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
-                  },
-                  performanceScore: dashItem?.performanceScore,
-                };
+          {/* Tracked items */}
+          {(() => {
+            const trackedItems = items.filter(i => i.is_active);
+            const untrackedItems = items.filter(i => !i.is_active);
 
-                return (
-                  <div key={item.id} style={{ opacity: item.is_active ? 1 : 0.5 }}>
-                    {editingItem?.id === item.id ? (
-                      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px' }}>
-                        <EditItemForm
-                          item={item}
-                          allTags={allTags}
-                          currentTagIds={(itemTags[item.id] || []).map(t => t.id)}
-                          onSaved={() => {
-                            setEditingItem(null);
-                            if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
-                            // Refresh tags
-                            Promise.all(items.map(async it => {
-                              const tags = await apiGet<Tag[]>(`/tags/items/${it.id}/tags`).catch(() => []);
-                              return { id: it.id, tags };
-                            })).then(results => {
-                              const map: Record<number, Tag[]> = {};
-                              results.forEach(r => { map[r.id] = r.tags; });
-                              setItemTags(map);
-                            });
-                            apiGet<Tag[]>('/tags').then(setAllTags).catch(() => {});
-                          }}
-                          onCancel={() => setEditingItem(null)}
-                        />
+            const renderItem = (item: TrackedItem, i: number, isTracked: boolean) => {
+              const dashItem = dashboardItems.find(d => d.id === item.id);
+              const statItem: StatCardItem = {
+                id: item.id,
+                platform: name,
+                display_name: item.display_name,
+                tags: (itemTags[item.id] || []).map(t => t.name),
+                lanes: dashItem ? itemToLanes(dashItem) : {
+                  Reach: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
+                  Interest: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
+                  Engagement: { current: 0, history: [0,0,0,0,0,0,0], velocity: 0 },
+                },
+                performanceScore: dashItem?.performanceScore,
+              };
+
+              return (
+                <div key={item.id} style={{ opacity: isTracked ? 1 : 0.5 }}>
+                  {editingItem?.id === item.id ? (
+                    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px' }}>
+                      <EditItemForm
+                        item={item}
+                        allTags={allTags}
+                        currentTagIds={(itemTags[item.id] || []).map(t => t.id)}
+                        onSaved={() => {
+                          setEditingItem(null);
+                          if (activeAccountId) apiGet<TrackedItem[]>(`/items/by-account/${activeAccountId}`).then(setItems);
+                          Promise.all(items.map(async it => {
+                            const tags = await apiGet<Tag[]>(`/tags/items/${it.id}/tags`).catch(() => []);
+                            return { id: it.id, tags };
+                          })).then(results => {
+                            const map: Record<number, Tag[]> = {};
+                            results.forEach(r => { map[r.id] = r.tags; });
+                            setItemTags(map);
+                          });
+                          apiGet<Tag[]>('/tags').then(setAllTags).catch(() => {});
+                        }}
+                        onCancel={() => setEditingItem(null)}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <StatCard item={statItem} index={i} />
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+                        <button onClick={() => setEditingItem(item)} style={{
+                          padding: '3px 8px', background: 'none', border: `1px solid ${C.border}`,
+                          borderRadius: 4, color: C.textMid, fontSize: 9, cursor: 'pointer', fontFamily: font,
+                        }}>Edit</button>
+                        {isTracked ? (
+                          <button onClick={() => handleUntrack(item.id)} style={{
+                            padding: '3px 8px', background: 'none', border: `1px solid ${C.down}55`,
+                            borderRadius: 4, color: C.down, fontSize: 9, cursor: 'pointer', fontFamily: font,
+                          }}>Untrack</button>
+                        ) : (
+                          <button onClick={() => handleRetrack(item.id)} style={{
+                            padding: '3px 8px', background: C.up + '15', border: `1px solid ${C.up}55`,
+                            borderRadius: 4, color: C.up, fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: font,
+                          }}>Re-track</button>
+                        )}
                       </div>
-                    ) : (
-                      <>
-                        <StatCard item={statItem} index={i} />
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
-                          <button onClick={() => setEditingItem(item)} style={{
-                            padding: '3px 8px', background: 'none', border: `1px solid ${C.border}`,
-                            borderRadius: 4, color: C.textMid, fontSize: 9, cursor: 'pointer', fontFamily: font,
-                          }}>Edit</button>
-                          <button onClick={() => handleToggleActive(item)} style={{
-                            padding: '3px 8px', background: 'none',
-                            border: `1px solid ${item.is_active ? C.up + '55' : C.border}`,
-                            borderRadius: 4, color: item.is_active ? C.up : C.textFaint,
-                            fontSize: 9, cursor: 'pointer', fontFamily: font,
-                          }}>{item.is_active ? 'Active' : 'Paused'}</button>
-                          {confirmRemoveId === item.id ? (
-                            <>
-                              <span style={{ fontSize: 9, color: '#c00', fontFamily: font }}>Sure?</span>
-                              <button onClick={() => handleRemoveItem(item.id)} style={{
-                                padding: '3px 8px', background: '#e8380d', border: 'none',
-                                borderRadius: 4, color: '#fff', fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: font,
-                              }}>Yes</button>
-                              <button onClick={() => setConfirmRemoveId(null)} style={{
-                                padding: '3px 8px', background: 'none', border: `1px solid ${C.border}`,
-                                borderRadius: 4, color: C.textMid, fontSize: 9, cursor: 'pointer', fontFamily: font,
-                              }}>No</button>
-                            </>
-                          ) : (
-                            <button onClick={() => setConfirmRemoveId(item.id)} style={{
-                              padding: '3px 8px', background: 'none', border: '1px solid #e8380d55',
-                              borderRadius: 4, color: '#e8380d', fontSize: 9, cursor: 'pointer', fontFamily: font,
-                            }}>Remove</button>
-                          )}
-                        </div>
-                      </>
-                    )}
+                    </>
+                  )}
+                </div>
+              );
+            };
+
+            return (
+              <>
+                {trackedItems.length === 0 && untrackedItems.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: C.textSoft, fontSize: 13, fontFamily: font }}>
+                    No tracked items yet. Click "+ Add Item" to start tracking.
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
+                      {trackedItems.map((item, i) => renderItem(item, i, true))}
+                    </div>
+
+                    {untrackedItems.length > 0 && (
+                      <div style={{ marginTop: 20 }}>
+                        <button onClick={() => setShowUntracked(!showUntracked)} style={{
+                          background: 'none', border: 'none', color: C.textFaint, fontSize: 10,
+                          fontFamily: font, cursor: 'pointer', letterSpacing: 2, textTransform: 'uppercase',
+                        }}>
+                          Untracked ({untrackedItems.length}) {showUntracked ? '▲' : '▼'}
+                        </button>
+                        {showUntracked && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14, marginTop: 10 }}>
+                            {untrackedItems.map((item, i) => renderItem(item, i, false))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

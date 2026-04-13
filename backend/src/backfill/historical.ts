@@ -3,6 +3,7 @@ import { decryptCredentials } from '../crypto/credentials';
 import { getLocalDate } from '../utils/timezone';
 import { computeInterestScore } from '../lanes/score';
 import { writeMetrics } from '../lanes/unify';
+import { insertPollLog } from '../db/queries/logs';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 const LOOKBACK_DAYS = 14;
@@ -217,6 +218,7 @@ async function backfillBing(trackedItemId: number, accountId: number, platformId
 
 /** Run historical backfill for a newly tracked item. Fire-and-forget. */
 export async function runHistoricalBackfill(trackedItemId: number, accountId: number, platform: string, platformIdentifier: string): Promise<void> {
+  insertPollLog({ metric_account_id: accountId, tracked_item_id: trackedItemId, platform, level: 'info', message: `Backfill started for ${platformIdentifier} (${LOOKBACK_DAYS} days)` });
   try {
     switch (platform) {
       case 'github': await backfillGithub(trackedItemId, accountId, platformIdentifier); break;
@@ -224,7 +226,9 @@ export async function runHistoricalBackfill(trackedItemId: number, accountId: nu
       case 'bing':   await backfillBing(trackedItemId, accountId, platformIdentifier); break;
       // Reddit has no historical API
     }
+    insertPollLog({ metric_account_id: accountId, tracked_item_id: trackedItemId, platform, level: 'info', message: `Backfill completed for ${platformIdentifier}` });
   } catch (err: any) {
     console.error(`[Backfill] Failed for ${platform} item ${trackedItemId}: ${err.message}`);
+    insertPollLog({ metric_account_id: accountId, tracked_item_id: trackedItemId, platform, level: 'error', message: `Backfill failed for ${platformIdentifier}: ${err.message}` });
   }
 }
