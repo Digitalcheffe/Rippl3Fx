@@ -7,7 +7,6 @@ import PerformanceTrend from '../components/PerformanceTrend';
 import LayeredInterestChart from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
 import SkeletonCard from '../components/SkeletonCard';
-import { LaneInfoButton, LaneInfoPanel } from '../components/LaneInfo';
 
 const font = "'DM Mono', monospace";
 
@@ -37,6 +36,23 @@ interface PlatformData {
   performanceScore: number;
   velocity: { reach: number; interest: number; engagement: number };
   performanceVelocity: number;
+  periodStart?: string;
+  periodEnd?: string;
+  peaks?: { reach_peak: number; interest_peak: number; engagement_peak: number };
+}
+
+/** Format a period date range for display (e.g., "Apr 7–13"). */
+function formatPeriodLabel(range: string, periodStart?: string | null, periodEnd?: string | null): string {
+  if ((range === 'weekly' || range === 'monthly') && periodStart && periodEnd) {
+    const s = new Date(periodStart + 'T12:00:00');
+    const e = new Date(periodEnd + 'T12:00:00');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    if (s.getMonth() === e.getMonth()) {
+      return `${months[s.getMonth()]} ${s.getDate()}–${e.getDate()}`;
+    }
+    return `${months[s.getMonth()]} ${s.getDate()} – ${months[e.getMonth()]} ${e.getDate()}`;
+  }
+  return { hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[range] || range;
 }
 
 interface DashboardResponse {
@@ -49,6 +65,7 @@ interface DashboardResponse {
     performanceScore: number;
     velocity: { reach: number; interest: number; engagement: number };
     performanceVelocity: number;
+    peaks?: { reach_peak: number; interest_peak: number; engagement_peak: number };
   };
   distribution: Record<string, { reach: number; interest: number; engagement: number }>;
   weights: { reach: number; interest: number; engagement: number };
@@ -71,7 +88,6 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<string | null>(null);
-  const [showInfo, setShowInfo] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -196,30 +212,21 @@ export default function Dashboard() {
             weights={weights}
             activeCard={activeChart}
             onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
-            timeLabel={{ hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[timeRange]}
+            timeLabel={formatPeriodLabel(timeRange, Object.values(data?.platforms || {})[0]?.periodStart, Object.values(data?.platforms || {})[0]?.periodEnd)}
             peaks={totals?.peaks}
           />
 
-          {/* Collapsible chart panel */}
-          <div style={{
-            maxHeight: activeChart ? 400 : 0,
-            opacity: activeChart ? 1 : 0,
-            overflow: 'hidden',
-            transition: 'max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease',
-            marginBottom: activeChart ? 20 : 0,
-          }}>
-            {activeChart === 'Performance' ? (
-              <PerformanceTrend items={items} onClose={() => setActiveChart(null)} range={timeRange} />
-            ) : activeChart ? (
+          {/* Always-visible lane chart — shows all lanes or single lane on card click */}
+          {items.length > 0 && (
+            <div style={{ marginTop: 12, marginBottom: 16 }}>
               <LayeredInterestChart
                 items={items}
-                lane={activeChart}
+                lane={activeChart || 'all'}
                 tag={activeTag !== 'All' ? activeTag : undefined}
-                onClose={() => setActiveChart(null)}
                 range={timeRange}
               />
-            ) : null}
-          </div>
+            </div>
+          )}
 
           {/* Platform / item stat cards */}
           <div style={{ display: 'grid', gridTemplateColumns: showingTagged ? 'repeat(auto-fill, minmax(360px, 1fr))' : `repeat(${Math.min(platformStatItems.length, 3)}, 1fr)`, gap: 14 }}>

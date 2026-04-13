@@ -89,12 +89,12 @@ Velocity is day-over-day, week-over-week, and month-over-month delta for each la
 |---------|--------|----------|
 | Hour over hour | hourly snapshots (48hr retention) | Every hour |
 | Day over day | daily rollups | Daily at 23:55 |
-| Week over week | weekly rollups | Sunday at 23:58 |
+| Week over week | weekly rollups | End of week (configurable start day) |
 | Month over month | monthly rollups | Last day of month at 23:59 |
 
 ### Hourly Retention Rule — CRITICAL
 
-Hourly snapshots are retained for **48 hours only** then purged. The daily rollup job at 23:55 must capture all hourly rows for that day before any purge runs. The first hour of a launch is often the most significant data point — it must never be lost to a rollup timing gap.
+Hourly data is stored in a **separate `hourly_metrics` table** — not in `tracked_metrics` which is reserved for the permanent daily/weekly/monthly pipeline. Hourly data is retained for **48 hours only** then purged. The daily rollup job must capture all hourly rows for that day before any purge runs. The first hour of a launch is often the most significant data point — it must never be lost to a rollup timing gap.
 
 Rollup order on any given night: **daily rollup first, hourly purge second.**
 
@@ -268,9 +268,28 @@ CREATE TABLE performance_weights (
 -- Weights must sum to 1.0 — validated on write.
 ```
 
-### 8.2 Platform Snapshot Tables
+### 8.2 Hourly Metrics (Separate Table)
 
-Each platform has five tables: hourly snapshots (48hr retention), daily, weekly, and monthly rollups.
+Hourly lane values are stored in a **dedicated `hourly_metrics` table**, separate from the permanent `tracked_metrics` pipeline. This keeps throwaway real-time data (purged after 48hrs) isolated from the daily/weekly/monthly metrics that feed the permanent rollup chain.
+
+```sql
+CREATE TABLE hourly_metrics (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  tracked_item_id   INTEGER NOT NULL REFERENCES tracked_items(id),
+  platform          TEXT NOT NULL,
+  period_start      TEXT NOT NULL,
+  reach_value       REAL NOT NULL DEFAULT 0,
+  interest_value    REAL NOT NULL DEFAULT 0,
+  engagement_value  REAL NOT NULL DEFAULT 0,
+  performance_score REAL NOT NULL DEFAULT 0,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(tracked_item_id, period_start)
+);
+```
+
+### 8.3 Platform Snapshot Tables
+
+Each platform has tables: raw snapshots (per-poll data), daily, weekly, and monthly rollups.
 
 **Rollup strategy per metric type:**
 
@@ -313,13 +332,17 @@ backend/src/
 │   └── scheduler.ts
 ├── rollup/
 │   ├── daily.ts
-│   ├── weekly.ts
+│   ├── weekly.ts              # User-configurable week start day
 │   ├── monthly.ts
-│   └── hourly-purge.ts       # Purges hourly rows older than 48hrs AFTER daily rollup
+│   └── hourly-purge.ts       # Purges hourly_metrics rows >48hrs AFTER daily rollup
 ├── lanes/
 │   ├── mapper.ts             # Maps raw platform metrics → Reach/Interest/Engagement
+│   ├── calc.ts               # Config-driven lane calculation with delta tracking
 │   ├── velocity.ts           # Delta calculations per time horizon
 │   └── performance.ts        # Performance score computation using stored weights
+├── utils/
+│   ├── timezone.ts           # Timezone-aware date helpers
+│   └── week.ts               # Shared getWeekStart/getWeekEnd (configurable start day)
 └── auth/
     ├── jwt.ts
     ├── bcrypt.ts
@@ -434,7 +457,7 @@ volumes:
 - Top nav: All Metrics | Reddit | GitHub | GA4 | Bing | Settings
 - **All Metrics:** tag filter, three lanes rolled up across all platforms, performance score, layered interest chart
 - **Platform pages:** account-level stats, three lanes for that platform, discovery panel (Get Info + Tag & Track), tracked items list
-- **Settings:** Profile / Password / TOTP / Metric Accounts / Performance Weights (adjustable with live preview)
+- **Settings:** Profile (username, week start day) / Password / TOTP / Metric Accounts / Performance Weights (adjustable with live preview)
 - **First run:** setup screen — username, password, optional TOTP
 
 ---
@@ -448,6 +471,9 @@ volumes:
 - **Weights shown on chart** — math is always visible so users understand what they're seeing
 - **platforms/ not collectors/** — folder name reflects what it is: platform integrations
 - **lanes/ module** — clean separation between data collection and lane computation
+- **Hourly metrics in separate table** — `hourly_metrics` is throwaway real-time data (purged after 48hrs), kept isolated from the permanent `tracked_metrics` pipeline (daily/weekly/monthly)
 - **Hourly purge after daily rollup** — first-hour launch data is irreplaceable; rollup always runs first
+- **Configurable week start day** — user can set week boundaries (Settings → Profile) stored in `user.week_start_day`; shared utility `utils/week.ts` replaces all hardcoded Monday logic
+- **Delta tracking for cumulative metrics** — GitHub stars/watchers/forks use `metric_previous` table to compute day-over-day deltas from cumulative API values; historical backfill days show 0 (expected, no per-day data from API)
 - **Discovery flow before tracking** — Get Info preview before committing to long-term polling keeps data intentional
 - **Account stats separate from tracked items** — platform pages show your overall presence independently of what you've chosen to track

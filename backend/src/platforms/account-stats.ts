@@ -5,6 +5,7 @@ import axios from 'axios';
 import { getLocalDate } from '../utils/timezone';
 import { calcPerformanceScore, updatePeaks } from '../lanes/unify';
 import { calcLanesFromRaw, calcLanesFromDaily } from '../lanes/calc';
+import { getWeekStart, getWeekEnd } from '../utils/week';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 interface LaneValues { reach: number; interest: number; engagement: number }
@@ -126,13 +127,6 @@ export async function collectAccountStats(accountId: number, platform: string, c
 
 const BACKFILL_DAYS = 14;
 
-function getMonday(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00');
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().split('T')[0];
-}
 
 function writeUnifiedRow(platform: string, periodType: string, periodStart: string, periodEnd: string, lanes: LaneValues): void {
   const perf = calcPerformanceScore(lanes);
@@ -306,15 +300,15 @@ export async function backfillAccountStats(accountId: number, platform: string, 
     // Roll up weekly
     const weeks: Record<string, LaneValues> = {};
     for (const { date, lanes } of computed) {
-      const mon = getMonday(date);
-      if (!weeks[mon]) weeks[mon] = { reach: 0, interest: 0, engagement: 0 };
-      weeks[mon].reach += lanes.reach;
-      weeks[mon].interest += lanes.interest;
-      weeks[mon].engagement += lanes.engagement;
+      const ws = getWeekStart(date);
+      if (!weeks[ws]) weeks[ws] = { reach: 0, interest: 0, engagement: 0 };
+      weeks[ws].reach += lanes.reach;
+      weeks[ws].interest += lanes.interest;
+      weeks[ws].engagement += lanes.engagement;
     }
-    for (const [mon, lanes] of Object.entries(weeks)) {
-      const sun = new Date(new Date(mon + 'T12:00:00').getTime() + 6 * 86_400_000).toISOString().split('T')[0];
-      writeUnifiedRow(platform, 'weekly', mon, sun, lanes);
+    for (const [ws, lanes] of Object.entries(weeks)) {
+      const we = getWeekEnd(ws);
+      writeUnifiedRow(platform, 'weekly', ws, we, lanes);
     }
 
     // Roll up monthly

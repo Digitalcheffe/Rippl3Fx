@@ -1,14 +1,6 @@
 import db from '../connection';
 import { getLocalDate } from '../../utils/timezone';
-
-/** Get Monday of the week containing a date. */
-function getMonday(dateStr?: string): string {
-  const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().split('T')[0];
-}
+import { getWeekStart, getWeekEnd } from '../../utils/week';
 
 /** Get first day of the month containing a date. */
 function getMonthStart(dateStr?: string): string {
@@ -22,9 +14,8 @@ function computeCurrentPeriod(trackedItemId: number, periodType: 'weekly' | 'mon
   let periodStart: string, periodEnd: string;
 
   if (periodType === 'weekly') {
-    periodStart = getMonday(today);
-    const sun = new Date(new Date(periodStart + 'T12:00:00').getTime() + 6 * 86_400_000);
-    periodEnd = sun.toISOString().split('T')[0];
+    periodStart = getWeekStart(today);
+    periodEnd = getWeekEnd(periodStart);
   } else {
     periodStart = getMonthStart(today);
     const [y, m] = periodStart.split('-').map(Number);
@@ -124,14 +115,37 @@ export function getTrackedByTag(tagName: string, periodType: string, limit: numb
   `).all(tagName, periodType, limit) as Record<string, any>[];
 }
 
-/** Purge all tracked_metrics for an item (permanent delete). */
+// ── Hourly queries (separate table: hourly_metrics) ──
+
+/** Get the two most recent hourly_metrics rows for velocity. */
+export function getHourlyPair(trackedItemId: number): { current: Record<string, any> | null; previous: Record<string, any> | null } {
+  const rows = db.prepare(
+    'SELECT * FROM hourly_metrics WHERE tracked_item_id = ? ORDER BY period_start DESC LIMIT 2'
+  ).all(trackedItemId) as Record<string, any>[];
+  return { current: rows[0] ?? null, previous: rows[1] ?? null };
+}
+
+/** Get N most recent hourly_metrics rows for an item's trend chart. */
+export function getHourlyHistory(trackedItemId: number, limit: number = 7): Record<string, any>[] {
+  return db.prepare(
+    'SELECT * FROM hourly_metrics WHERE tracked_item_id = ? ORDER BY period_start DESC LIMIT ?'
+  ).all(trackedItemId, limit) as Record<string, any>[];
+}
+
+/** Purge all tracked_metrics + hourly_metrics for an item (permanent delete). */
 export function purgeTrackedMetrics(trackedItemId: number): number {
+  db.prepare('DELETE FROM hourly_metrics WHERE tracked_item_id = ?').run(trackedItemId);
   const result = db.prepare('DELETE FROM tracked_metrics WHERE tracked_item_id = ?').run(trackedItemId);
   return result.changes;
 }
 
-/** Purge all tracked_metrics for all items under an account (permanent account delete). */
+/** Purge all tracked_metrics + hourly_metrics for all items under an account (permanent account delete). */
 export function purgeTrackedMetricsByAccount(accountId: number): number {
+  db.prepare(`
+    DELETE FROM hourly_metrics WHERE tracked_item_id IN (
+      SELECT id FROM tracked_items WHERE metric_account_id = ?
+    )
+  `).run(accountId);
   const result = db.prepare(`
     DELETE FROM tracked_metrics WHERE tracked_item_id IN (
       SELECT id FROM tracked_items WHERE metric_account_id = ?

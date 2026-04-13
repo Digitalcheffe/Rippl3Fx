@@ -1,14 +1,6 @@
 import db from '../connection';
 import { getLocalDate } from '../../utils/timezone';
-
-/** Get Monday of the week containing a date. */
-function getMonday(dateStr?: string): string {
-  const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().split('T')[0];
-}
+import { getWeekStart, getWeekEnd } from '../../utils/week';
 
 /** Get first day of the month containing a date. */
 function getMonthStart(dateStr?: string): string {
@@ -22,9 +14,8 @@ function computeCurrentUnified(platform: string, periodType: 'weekly' | 'monthly
   let periodStart: string, periodEnd: string;
 
   if (periodType === 'weekly') {
-    periodStart = getMonday(today);
-    const sun = new Date(new Date(periodStart + 'T12:00:00').getTime() + 6 * 86_400_000);
-    periodEnd = sun.toISOString().split('T')[0];
+    periodStart = getWeekStart(today);
+    periodEnd = getWeekEnd(periodStart);
   } else {
     periodStart = getMonthStart(today);
     const [y, m] = periodStart.split('-').map(Number);

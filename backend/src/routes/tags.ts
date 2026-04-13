@@ -47,6 +47,17 @@ router.post('/', (req: Request, res: Response) => {
   res.status(201).json(tag);
 });
 
+// GET /api/tags/:id/usage — check how many items use this tag
+router.get('/:id/usage', (req: Request, res: Response) => {
+  const tag = getTagById(Number(req.params.id));
+  if (!tag) {
+    res.status(404).json({ error: 'Tag not found' });
+    return;
+  }
+  const items = getItemsForTag(tag.id);
+  res.json({ tag, itemCount: items.length, items: items.map((i: any) => ({ id: i.id, display_name: i.display_name })) });
+});
+
 // DELETE /api/tags/:id
 router.delete('/:id', (req: Request, res: Response) => {
   const deleted = deleteTag(Number(req.params.id));

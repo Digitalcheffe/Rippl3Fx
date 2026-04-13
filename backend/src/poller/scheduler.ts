@@ -49,7 +49,7 @@ async function pollAccount(account: ReturnType<typeof getDueAccounts>[0]): Promi
         const snap = getLatestSnapshot(item.id, account.platform);
         if (snap) {
           const now = getLocalDate();
-          writeMetrics(item.id, account.platform, 'hourly', now, now, snap);
+          writeMetrics(item.id, account.platform, 'hourly', now, now, snap, account.id);
         }
       } else {
         insertPollLog({ metric_account_id: account.id, tracked_item_id: item.id, platform: account.platform, level: 'error', message: `Failed ${item.display_name} (${item.platform_identifier}): ${result.error}` });

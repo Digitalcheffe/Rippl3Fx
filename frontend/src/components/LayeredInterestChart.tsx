@@ -42,14 +42,15 @@ export interface LaneChartItem {
   engagementHistory?: number[];
 }
 
-function LayeredChartSVG({ items, width, height, lane, range = 'daily' }: { items: LaneChartItem[]; width: number; height: number; lane: string; range?: string }) {
+function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneColor = false }: { items: LaneChartItem[]; width: number; height: number; lane: string; range?: string; useLaneColor?: boolean }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const labels = getLabels(range);
-  const padL = 36, padR = 12, padT = 12, padB = 24;
+  const padL = 52, padR = 12, padT = 22, padB = 24;
   const cW = width - padL - padR;
   const cH = height - padT - padB;
 
   const histKey = LANE_HISTORY_KEY[lane] || 'interestHistory';
+  const laneColor = (C[lane as keyof typeof C] || C.accent) as string;
 
   // Group items by platform, sum their lane histories
   const platformData: Record<string, number[]> = {};
@@ -68,8 +69,6 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily' }: { item
 
   const toX = (i: number) => padL + (i / 6) * cW;
   const toY = (v: number) => padT + cH - (v / maxVal) * cH;
-
-  const laneColor = (C[lane as keyof typeof C] || C.accent) as string;
   const slotW = cW / labels.length;
 
   return (
@@ -80,7 +79,7 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily' }: { item
         return (
           <g key={pct}>
             <line x1={padL} y1={y} x2={width - padR} y2={y} stroke={C.border} strokeWidth={0.5} strokeDasharray="4,4" />
-            <text x={padL - 4} y={y + 3} fontSize="9" fill={C.textFaint} textAnchor="end" fontFamily="monospace">{pct}</text>
+            <text x={padL - 4} y={y + 3} fontSize="9" fill={C.textFaint} textAnchor="end" fontFamily="monospace">{Math.round((pct / 100) * maxVal)}</text>
           </g>
         );
       })}
@@ -97,7 +96,7 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily' }: { item
       {activePlatforms.map(platform => {
         const data = platformData[platform];
         const displayKey = PLATFORM_DISPLAY[platform] || platform;
-        const color = (C[displayKey as keyof typeof C] || C.accent) as string;
+        const color = useLaneColor ? laneColor : (C[displayKey as keyof typeof C] || C.accent) as string;
         const pts = data.map((v, i) => [toX(i), toY(v)]);
         const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
         const area = `${line} L${toX(6)},${padT + cH} L${toX(0)},${padT + cH} Z`;
@@ -106,9 +105,8 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily' }: { item
           <g key={platform}>
             <path d={area} fill={color} opacity={0.15} />
             <path d={line} fill="none" stroke={color} strokeWidth={2} opacity={0.8} strokeLinejoin="round" strokeLinecap="round" />
-            {/* Show all dots on hover, otherwise just last */}
             {pts.map(([x, y], i) => (
-              <circle key={i} cx={x} cy={y} r={hoverIdx === i ? 4 : (i === pts.length - 1 ? 3 : 0)} fill={color} style={{ transition: 'r 0.15s' }} />
+              <circle key={i} cx={x} cy={y} r={hoverIdx === i ? 5 : 2.5} fill={color} style={{ transition: 'r 0.15s' }} />
             ))}
           </g>
         );
@@ -133,19 +131,135 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily' }: { item
           value: platformData[p][hoverIdx] ?? 0,
           color: (C[(PLATFORM_DISPLAY[p] || p) as keyof typeof C] || C.accent) as string,
         }));
-        const tipW = 120;
-        const tipH = 14 + lines.length * 14;
+        const tipW = 150;
+        const tipH = 20 + lines.length * 20;
         const tipX = x + tipW + 8 > width ? x - tipW - 4 : x + 8;
         const tipY = Math.max(padT, padT + 4);
         return (
           <g>
             <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={6} fill={C.bgCard} stroke={C.border} strokeWidth={0.5} opacity={0.95} />
-            <text x={tipX + 8} y={tipY + 12} fontSize="9" fontWeight="700" fill={C.text} fontFamily={font}>{labels[hoverIdx]}</text>
+            <text x={tipX + 10} y={tipY + 16} fontSize="12" fontWeight="700" fill={C.text} fontFamily={font}>{labels[hoverIdx]}</text>
             {lines.map((l, li) => (
               <g key={l.name}>
-                <circle cx={tipX + 10} cy={tipY + 24 + li * 14} r={3} fill={l.color} />
-                <text x={tipX + 18} y={tipY + 27 + li * 14} fontSize="9" fill={C.textSoft} fontFamily={font}>{l.name}</text>
-                <text x={tipX + tipW - 8} y={tipY + 27 + li * 14} fontSize="9" fontWeight="700" fill={C.text} fontFamily={font} textAnchor="end">{l.value.toFixed(1)}</text>
+                <circle cx={tipX + 12} cy={tipY + 32 + li * 20} r={4} fill={l.color} />
+                <text x={tipX + 22} y={tipY + 36 + li * 20} fontSize="12" fill={C.textSoft} fontFamily={font}>{l.name}</text>
+                <text x={tipX + tipW - 10} y={tipY + 36 + li * 20} fontSize="12" fontWeight="700" fill={C.text} fontFamily={font} textAnchor="end">{l.value.toFixed(0)}</text>
+              </g>
+            ))}
+          </g>
+        );
+      })()}
+    </svg>
+  );
+}
+
+const LANE_COLORS: Record<string, string> = {
+  Reach: C.Reach as string,
+  Interest: C.Interest as string,
+  Engagement: C.Engagement as string,
+};
+
+const ALL_LANES = ['Reach', 'Interest', 'Engagement'];
+
+/** SVG chart showing all three lanes overlaid with their respective colors. */
+function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: LaneChartItem[]; width: number; height: number; range?: string }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const labels = getLabels(range);
+  const padL = 52, padR = 12, padT = 22, padB = 24;
+  const cW = width - padL - padR;
+  const cH = height - padT - padB;
+
+  // Sum history per lane across all items
+  const laneData: Record<string, number[]> = {};
+  for (const lane of ALL_LANES) {
+    laneData[lane] = new Array(7).fill(0);
+    const histKey = LANE_HISTORY_KEY[lane];
+    for (const item of items) {
+      const hist = (item as any)[histKey] || [];
+      for (let i = 0; i < 7; i++) {
+        laneData[lane][i] += hist[i] ?? 0;
+      }
+    }
+  }
+
+  const allValues = Object.values(laneData).flat();
+  const maxVal = Math.max(...allValues, 1);
+
+  const toX = (i: number) => padL + (i / 6) * cW;
+  const toY = (v: number) => padT + cH - (v / maxVal) * cH;
+  const slotW = cW / labels.length;
+
+  return (
+    <svg width={width} height={height} style={{ display: 'block' }}>
+      {/* Grid lines */}
+      {[25, 50, 75, 100].map(pct => {
+        const y = toY((pct / 100) * maxVal);
+        return (
+          <g key={pct}>
+            <line x1={padL} y1={y} x2={width - padR} y2={y} stroke={C.border} strokeWidth={0.5} strokeDasharray="4,4" />
+            <text x={padL - 4} y={y + 3} fontSize="9" fill={C.textFaint} textAnchor="end" fontFamily="monospace">{Math.round((pct / 100) * maxVal)}</text>
+          </g>
+        );
+      })}
+
+      {/* X axis labels */}
+      {labels.map((l, i) => (
+        <text key={l} x={toX(i)} y={height - 4} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
+      ))}
+
+      {/* Lane areas + lines */}
+      {ALL_LANES.map((lane, laneIdx) => {
+        const data = laneData[lane];
+        const color = LANE_COLORS[lane] || C.accent;
+        const pts = data.map((v, i) => [toX(i), toY(v)]);
+        const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+        const area = `${line} L${toX(6)},${padT + cH} L${toX(0)},${padT + cH} Z`;
+        // Stagger labels above the line per lane to avoid overlap
+        const labelYOffset = laneIdx === 0 ? -20 : laneIdx === 1 ? -14 : -8;
+
+        return (
+          <g key={lane}>
+            <path d={area} fill={color} opacity={0.1} />
+            <path d={line} fill="none" stroke={color} strokeWidth={2} opacity={0.8} strokeLinejoin="round" strokeLinecap="round" />
+            {pts.map(([x, y], i) => (
+              <circle key={i} cx={x} cy={y} r={hoverIdx === i ? 5 : 2.5} fill={color} style={{ transition: 'r 0.15s' }} />
+            ))}
+          </g>
+        );
+      })}
+
+      {/* Vertical hover line */}
+      {hoverIdx !== null && (
+        <line x1={toX(hoverIdx)} y1={padT} x2={toX(hoverIdx)} y2={padT + cH} stroke={C.textMid} strokeWidth={1} strokeDasharray="3,3" opacity={0.4} />
+      )}
+
+      {/* Invisible hover zones */}
+      {labels.map((_, i) => (
+        <rect key={i} x={toX(i) - slotW / 2} y={0} width={slotW} height={height} fill="transparent"
+          onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} style={{ cursor: 'crosshair' }} />
+      ))}
+
+      {/* Tooltip — show all lane values at hovered date */}
+      {hoverIdx !== null && (() => {
+        const x = toX(hoverIdx);
+        const lines = ALL_LANES.map(lane => ({
+          name: lane,
+          value: laneData[lane][hoverIdx] ?? 0,
+          color: LANE_COLORS[lane] || C.accent,
+        }));
+        const tipW = 150;
+        const tipH = 20 + lines.length * 20;
+        const tipX = x + tipW + 8 > width ? x - tipW - 4 : x + 8;
+        const tipY = Math.max(padT, padT + 4);
+        return (
+          <g>
+            <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={6} fill={C.bgCard} stroke={C.border} strokeWidth={0.5} opacity={0.95} />
+            <text x={tipX + 10} y={tipY + 16} fontSize="12" fontWeight="700" fill={C.text} fontFamily={font}>{labels[hoverIdx]}</text>
+            {lines.map((l, li) => (
+              <g key={l.name}>
+                <circle cx={tipX + 12} cy={tipY + 32 + li * 20} r={4} fill={l.color} />
+                <text x={tipX + 22} y={tipY + 36 + li * 20} fontSize="12" fill={C.textSoft} fontFamily={font}>{l.name}</text>
+                <text x={tipX + tipW - 10} y={tipY + 36 + li * 20} fontSize="12" fontWeight="700" fill={C.text} fontFamily={font} textAnchor="end">{l.value.toFixed(0)}</text>
               </g>
             ))}
           </g>
@@ -172,18 +286,26 @@ export default function LayeredInterestChart({ items, lane = 'Interest', tag, on
 
   if (items.length === 0) return null;
 
+  const isAllLanes = lane === 'all';
+  const laneColor = isAllLanes ? (C.accent as string) : (C[lane as keyof typeof C] || C.accent) as string;
   const platforms = [...new Set(items.map(i => i.platform))];
-  const laneColor = (C[lane as keyof typeof C] || C.accent) as string;
 
   return (
     <div ref={containerRef} style={{ background: C.bgCard, border: `1px solid ${laneColor}30`, borderTop: `3px solid ${laneColor}`, borderRadius: 12, padding: '16px 20px', boxShadow: '0 2px 8px rgba(30,58,95,0.07)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: 3, color: laneColor, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>{lane} Trend</div>
+          <div style={{ fontSize: 10, letterSpacing: 3, color: laneColor, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>
+            {isAllLanes ? 'Lane Overview' : `${lane} Trend`}
+          </div>
           {tag && <div style={{ fontSize: 13, fontWeight: 700, color: C.text, fontFamily: font }}>#{tag}</div>}
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {platforms.map(p => {
+          {isAllLanes ? ALL_LANES.map(l => (
+            <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 12, height: 2, background: LANE_COLORS[l], borderRadius: 1 }} />
+              <span style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>{l}</span>
+            </div>
+          )) : platforms.map(p => {
             const displayKey = PLATFORM_DISPLAY[p] || p;
             const color = (C[displayKey as keyof typeof C] || C.accent) as string;
             return (
@@ -199,7 +321,10 @@ export default function LayeredInterestChart({ items, lane = 'Interest', tag, on
         </div>
       </div>
 
-      <LayeredChartSVG items={items} width={width - 40} height={120} lane={lane} range={range} />
+      {isAllLanes
+        ? <AllLanesChartSVG items={items} width={width - 40} height={160} range={range} />
+        : <LayeredChartSVG items={items} width={width - 40} height={160} lane={lane} range={range} useLaneColor />
+      }
     </div>
   );
 }

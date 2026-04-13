@@ -2,35 +2,13 @@ import db from '../db/connection';
 import {
   insertGithubWeekly, insertGA4Weekly, insertBingWeekly,
 } from '../db/queries/rollup';
-import { getLocalDate } from '../utils/timezone';
 import { writeTrackedMetric, refreshUnifiedMetric, calcPerformanceScore } from '../lanes/unify';
-
-/**
- * Get Monday of the week containing the given date (timezone-aware).
- */
-function getMonday(date: Date): string {
-  // Get the local date string, then work with that
-  const localStr = getLocalDate(date);
-  const d = new Date(localStr + 'T12:00:00'); // noon to avoid DST edge cases
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day; // Sunday → previous Monday
-  d.setDate(d.getDate() + diff);
-  return getLocalDate(d);
-}
-
-function getPreviousMonday(): string {
-  const now = new Date();
-  // Go back 7 days to get into last week, then find that Monday
-  const lastWeek = new Date(now.getTime() - 7 * 86_400_000);
-  return getMonday(lastWeek);
-}
+import { getWeekStart, getWeekEnd, getPreviousWeekStart } from '../utils/week';
+import { getLocalDate } from '../utils/timezone';
 
 export function runWeeklyRollup(weekStartDate?: string): void {
-  const periodStart = weekStartDate || getPreviousMonday();
-  // Sunday = Monday + 6 days
-  const mondayDate = new Date(periodStart + 'T12:00:00');
-  const sundayDate = new Date(mondayDate.getTime() + 6 * 86_400_000);
-  const periodEnd = getLocalDate(sundayDate);
+  const periodStart = weekStartDate || getPreviousWeekStart();
+  const periodEnd = getWeekEnd(periodStart);
 
   console.log(`[Rollup] Running weekly rollup for ${periodStart} to ${periodEnd}`);
 
@@ -91,4 +69,50 @@ export function runWeeklyRollup(weekStartDate?: string): void {
   }
 
   console.log(`[Rollup] Weekly rollup complete — processed ${count} items`);
+}
+
+/**
+ * Re-rollup all weekly data from dailies using current week boundaries.
+ * Called when week_start_day changes — clears all weekly rows and rebuilds.
+ */
+export function rerollWeeklyData(weekStartDay: number): void {
+  console.log(`[Rollup] Re-rolling weekly data for week start day ${weekStartDay}`);
+
+  // Delete all weekly rows from tracked_metrics and unified_metrics
+  db.prepare("DELETE FROM tracked_metrics WHERE period_type = 'weekly'").run();
+  db.prepare("DELETE FROM unified_metrics WHERE period_type = 'weekly'").run();
+
+  // Delete platform weekly tables
+  for (const table of ['github_weekly', 'ga4_weekly', 'bing_weekly']) {
+    try { db.prepare(`DELETE FROM ${table}`).run(); } catch { /* table may not exist */ }
+  }
+
+  // Find the date range of all daily data
+  const range = db.prepare(
+    "SELECT MIN(period_start) as min_date, MAX(period_start) as max_date FROM unified_metrics WHERE period_type = 'daily'"
+  ).get() as { min_date: string | null; max_date: string | null };
+
+  if (!range?.min_date || !range?.max_date) {
+    console.log('[Rollup] No daily data to re-roll');
+    return;
+  }
+
+  // Walk through each week from min_date to max_date
+  let current = getWeekStart(range.min_date, weekStartDay);
+  const end = range.max_date;
+  const weeks: string[] = [];
+
+  while (current <= end) {
+    weeks.push(current);
+    const d = new Date(current + 'T12:00:00');
+    d.setDate(d.getDate() + 7);
+    current = getLocalDate(d);
+  }
+
+  // Re-rollup each week
+  for (const weekStart of weeks) {
+    runWeeklyRollup(weekStart);
+  }
+
+  console.log(`[Rollup] Re-rolled ${weeks.length} weeks`);
 }

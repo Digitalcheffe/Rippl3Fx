@@ -53,6 +53,7 @@ export default function Settings() {
     { k: 'profile', l: 'Profile' },
     { k: 'accounts', l: 'Platform Accounts' },
     { k: 'items', l: 'Tracked Items' },
+    { k: 'tags', l: 'Tags' },
     { k: 'weights', l: 'Performance Weights' },
     { k: 'logs', l: 'Poll Logs' },
   ];
@@ -90,6 +91,7 @@ export default function Settings() {
           )}
           {tab === 'accounts' && <AccountsTab />}
           {tab === 'items' && <TrackedItemsTab />}
+          {tab === 'tags' && <TagsTab />}
           {tab === 'weights' && <WeightsTab />}
           {tab === 'logs' && <LogsTab />}
         </div>
@@ -98,10 +100,17 @@ export default function Settings() {
   );
 }
 
+const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 // ── Profile Tab ──
-function ProfileTab({ user }: { user: any; onUpdate: () => void }) {
+function ProfileTab({ user, onUpdate }: { user: any; onUpdate: () => void }) {
   const [username, setUsername] = useState(user?.username || '');
+  const [weekStartDay, setWeekStartDay] = useState<number>(user?.week_start_day ?? 1);
   const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    if (user?.week_start_day !== undefined) setWeekStartDay(user.week_start_day);
+  }, [user?.week_start_day]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -109,11 +118,32 @@ function ProfileTab({ user }: { user: any; onUpdate: () => void }) {
         <label style={labelStyle}>Username</label>
         <input value={username} onChange={e => setUsername(e.target.value)} style={inp} />
       </div>
+      <div>
+        <label style={labelStyle}>Week Starts On</label>
+        <select
+          value={weekStartDay}
+          onChange={e => setWeekStartDay(Number(e.target.value))}
+          style={{ ...inp, cursor: 'pointer' }}
+        >
+          {DAYS_OF_WEEK.map((day, i) => (
+            <option key={i} value={i}>{day}</option>
+          ))}
+        </select>
+        <div style={{ fontSize: 10, color: C.textSoft, fontFamily: font, marginTop: 4 }}>
+          Controls weekly rollup boundaries and chart labels
+        </div>
+      </div>
       {msg && <div style={{ fontSize: 12, color: C.up, fontFamily: font }}>{msg}</div>}
       <button style={{ ...btnP, alignSelf: 'flex-start' }} onClick={async () => {
-        // Username is read-only for now (single user)
-        setMsg('Profile saved');
-        setTimeout(() => setMsg(''), 2000);
+        try {
+          await apiPut('/auth/week-start', { weekStartDay });
+          onUpdate();
+          setMsg('Profile saved');
+          setTimeout(() => setMsg(''), 2000);
+        } catch {
+          setMsg('Failed to save');
+          setTimeout(() => setMsg(''), 2000);
+        }
       }}>Save Changes</button>
     </div>
   );
@@ -272,6 +302,7 @@ function AccountsTab() {
   const [accountItems, setAccountItems] = useState<Array<{ id: number; display_name: string; platform_identifier: string }>>([]);
   const [backfillingId, setBackfillingId] = useState<number | null>(null);
   const [confirmDeleteAccountId, setConfirmDeleteAccountId] = useState<number | null>(null);
+  const [deleteMsg, setDeleteMsg] = useState('');
 
   const loadAccounts = async () => {
     try {
@@ -305,7 +336,7 @@ function AccountsTab() {
     setTimeout(() => setBackfillingId(null), 3000);
   };
 
-  const handleBackfillAll = async (accountId: number) => {
+  const handleBackfillAll = async (_accountId: number) => {
     for (const item of accountItems) {
       setBackfillingId(item.id);
       try {
@@ -328,13 +359,24 @@ function AccountsTab() {
   };
 
   const handleDelete = async (id: number) => {
-    await apiDelete(`/accounts/${id}`);
-    setConfirmDeleteAccountId(null);
-    loadAccounts();
+    const name = accounts.find(a => a.id === id)?.display_name || 'Account';
+    try {
+      await apiDelete(`/accounts/${id}`);
+      setConfirmDeleteAccountId(null);
+      setAccounts(prev => prev.filter(a => a.id !== id));
+      setDeleteMsg(`${name} deleted`);
+      setTimeout(() => setDeleteMsg(''), 3000);
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setDeleteMsg('Delete failed — try again');
+      setTimeout(() => setDeleteMsg(''), 3000);
+      setConfirmDeleteAccountId(null);
+    }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {deleteMsg && <div style={{ fontSize: 12, color: C.up, fontFamily: font, padding: '6px 0' }}>{deleteMsg}</div>}
       {accounts.map(a => {
         const platformName = a.platform.charAt(0).toUpperCase() + a.platform.slice(1);
         const displayPlatform = a.platform === 'ga4' ? 'GA4' : platformName;
@@ -673,6 +715,106 @@ function TrackedItemsTab() {
         <strong style={{ color: C.textSoft }}>Untrack</strong> stops polling and clears tags but preserves all metric history.
         <br /><strong style={{ color: '#e8380d' }}>Delete</strong> permanently removes the item and all its metric data. This cannot be undone.
       </div>
+    </div>
+  );
+}
+
+// ── Tags Tab ──
+function TagsTab() {
+  const [tags, setTags] = useState<Array<{ id: number; name: string }>>([]);
+  const [usage, setUsage] = useState<Record<number, { itemCount: number; items: Array<{ id: number; display_name: string }> }>>({});
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  const [msg, setMsg] = useState('');
+
+  const loadTags = async () => {
+    try {
+      const allTags = await apiGet<Array<{ id: number; name: string }>>('/tags');
+      setTags(allTags);
+      // Load usage for each tag
+      const usageMap: typeof usage = {};
+      await Promise.all(allTags.map(async t => {
+        try {
+          const u = await apiGet<{ itemCount: number; items: Array<{ id: number; display_name: string }> }>(`/tags/${t.id}/usage`);
+          usageMap[t.id] = u;
+        } catch { /* ignore */ }
+      }));
+      setUsage(usageMap);
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => { loadTags(); }, []);
+
+  const handleDelete = async (tagId: number) => {
+    try {
+      await apiDelete(`/tags/${tagId}`);
+      setConfirmDelete(null);
+      setMsg('Tag deleted');
+      setTimeout(() => setMsg(''), 2000);
+      loadTags();
+    } catch {
+      setMsg('Failed to delete tag');
+      setTimeout(() => setMsg(''), 2000);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 10, letterSpacing: 2, color: C.textMid, textTransform: 'uppercase', fontFamily: font }}>
+        Manage Tags
+      </div>
+      {msg && <div style={{ fontSize: 12, color: C.up, fontFamily: font }}>{msg}</div>}
+      {tags.length === 0 ? (
+        <div style={{ fontSize: 13, color: C.textSoft, fontFamily: font, padding: '20px 0' }}>
+          No tags yet. Tags are created when you track items.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {tags.map(tag => {
+            const u = usage[tag.id];
+            const inUse = u && u.itemCount > 0;
+            const isConfirming = confirmDelete === tag.id;
+
+            return (
+              <div key={tag.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', background: C.bg, border: `1px solid ${C.border}`,
+                borderRadius: 8,
+              }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.accent, fontFamily: font }}>#{tag.name}</span>
+                  <span style={{ fontSize: 11, color: C.textSoft, fontFamily: font, marginLeft: 10 }}>
+                    {u ? `${u.itemCount} item${u.itemCount !== 1 ? 's' : ''}` : '...'}
+                  </span>
+                  {isConfirming && inUse && (
+                    <div style={{ fontSize: 11, color: C.down, fontFamily: font, marginTop: 4 }}>
+                      This tag is used by: {u.items.map(i => i.display_name).join(', ')}. Deleting will remove it from all items.
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {isConfirming ? (
+                    <>
+                      <button onClick={() => handleDelete(tag.id)} style={{
+                        padding: '4px 10px', background: C.down, border: 'none', borderRadius: 4,
+                        color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: font,
+                      }}>Confirm Delete</button>
+                      <button onClick={() => setConfirmDelete(null)} style={{
+                        padding: '4px 10px', background: 'none', border: `1px solid ${C.border}`, borderRadius: 4,
+                        color: C.textMid, fontSize: 10, cursor: 'pointer', fontFamily: font,
+                      }}>Cancel</button>
+                    </>
+                  ) : (
+                    <button onClick={() => setConfirmDelete(tag.id)} style={{
+                      padding: '4px 10px', background: 'none', border: `1px solid ${C.down}40`, borderRadius: 4,
+                      color: C.down, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: font,
+                    }}>Delete</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

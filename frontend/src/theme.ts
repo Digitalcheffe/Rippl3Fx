@@ -18,7 +18,7 @@ export const C = {
   GA4:         '#e6a817',
   Bing:        '#00897b',
   Reach:       '#0969da',
-  Interest:    '#e6a817',
+  Interest:    '#0d9488',
   Engagement:  '#e8380d',
   up:          '#0d9488',
   down:        '#e8380d',

@@ -127,6 +127,12 @@ If you see an error about "Service account key creation is disabled," your accou
    - **Site URL** — your verified site URL (e.g. `https://yoursite.com`)
    - **API Key** — from the settings above
 
+## Configuration
+
+### Week Start Day
+
+By default, weekly metrics use Monday as the first day of the week. Change this in **Settings → Profile → Week Starts On** to any day (Sunday through Saturday). All weekly rollups, chart boundaries, and date labels will align to your preference.
+
 ## Environment Variables
 
 ```env

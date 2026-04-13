@@ -54,6 +54,7 @@ router.post('/', (req: Request, res: Response) => {
 
   const encrypted = encryptCredentials(credentials);
   const account = createAccount(platform, display_name, encrypted, interval);
+  if (!account) { res.status(500).json({ error: 'Failed to create account' }); return; }
   res.status(201).json(account);
 
   // Fire-and-forget: backfill 14 days of account-level stats
@@ -142,23 +143,44 @@ router.delete('/:id', (req: Request, res: Response) => {
   const account = getAccountById(id);
   if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
 
-  // Purge all tracked_metrics for items under this account
-  const purged = purgeTrackedMetricsByAccount(id);
-  // Purge peak_metrics for items under this account
   const dbConn = require('../db/connection').default;
-  dbConn.prepare('DELETE FROM peak_metrics WHERE tracked_item_id IN (SELECT id FROM tracked_items WHERE metric_account_id = ?)').run(id);
-  // Delete account (cascades to tracked_items and item_tags via deleteAccount)
-  deleteAccount(id);
-  // Recalculate unified_metrics for the platform from remaining tracked_metrics
+  const itemIds = dbConn.prepare('SELECT id FROM tracked_items WHERE metric_account_id = ?').all(id) as Array<{ id: number }>;
+  const idList = itemIds.map(i => i.id);
+
+  if (idList.length > 0) {
+    const placeholders = idList.map(() => '?').join(',');
+    // Clean up all references to tracked items
+    dbConn.prepare(`DELETE FROM tracked_metrics WHERE tracked_item_id IN (${placeholders})`).run(...idList);
+    dbConn.prepare(`DELETE FROM hourly_metrics WHERE tracked_item_id IN (${placeholders})`).run(...idList);
+    dbConn.prepare(`DELETE FROM peak_metrics WHERE tracked_item_id IN (${placeholders})`).run(...idList);
+    dbConn.prepare(`DELETE FROM metric_previous WHERE tracked_item_id IN (${placeholders})`).run(...idList);
+    dbConn.prepare(`DELETE FROM item_tags WHERE tracked_item_id IN (${placeholders})`).run(...idList);
+    // Platform snapshot/daily/weekly/monthly tables
+    for (const table of ['github_snapshots','github_daily','github_weekly','github_monthly',
+                         'ga4_snapshots','ga4_daily','ga4_weekly','ga4_monthly',
+                         'bing_snapshots','bing_daily','bing_weekly','bing_monthly',
+                         'reddit_snapshots','reddit_daily','reddit_weekly','reddit_monthly']) {
+      try { dbConn.prepare(`DELETE FROM ${table} WHERE tracked_item_id IN (${placeholders})`).run(...idList); } catch { /* table may not exist */ }
+    }
+  }
+
+  // Clean account-level metric_previous
+  dbConn.prepare('DELETE FROM metric_previous WHERE metric_account_id = ? AND tracked_item_id = 0').run(id);
+  // Poll logs preserved — standalone audit trail
+
+  // Delete tracked items then account
+  dbConn.prepare('DELETE FROM tracked_items WHERE metric_account_id = ?').run(id);
+  dbConn.prepare('DELETE FROM metric_accounts WHERE id = ?').run(id);
+
+  // Clean up unified_metrics for this platform if no data remains
   const platform = account.platform;
   const remaining = dbConn.prepare("SELECT COUNT(*) as c FROM tracked_metrics WHERE platform = ?").get(platform) as any;
   if (remaining.c === 0) {
-    // No data left for this platform — clear unified_metrics
     dbConn.prepare('DELETE FROM unified_metrics WHERE platform = ?').run(platform);
     dbConn.prepare('DELETE FROM peak_metrics WHERE platform = ? AND tracked_item_id IS NULL').run(platform);
   }
 
-  res.json({ success: true, message: `Account permanently deleted. ${purged} metric rows purged.` });
+  res.json({ success: true, message: `Account permanently deleted. ${idList.length} items purged.` });
 });
 
 // POST /api/accounts/:id/poll-now — trigger immediate poll

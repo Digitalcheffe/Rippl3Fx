@@ -161,7 +161,7 @@ export async function runDailyRollup(date?: string): Promise<void> {
           `SELECT * FROM ${dailyTable} WHERE tracked_item_id = ? AND period_start = ?`
         ).get(item.id, rollupDate) as Record<string, any> | undefined;
         if (dailyRow) {
-          writeMetrics(item.id, item.platform, 'daily', rollupDate, rollupDate, dailyRow);
+          writeMetrics(item.id, item.platform, 'daily', rollupDate, rollupDate, dailyRow, item.metric_account_id);
         }
       }
 
