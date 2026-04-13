@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
-import db from '../db/connection';
 import { getTrackedItemsWithPlatform, getTagsForItem, getLatestSnapshot } from '../db/queries/metrics';
-import { getLatestTracked, getTrackedPair, getTrackedHistory } from '../db/queries/tracked';
-import { getUnifiedPair, getAllPlatformHistory } from '../db/queries/unified';
+import { getTrackedPair, getTrackedHistory } from '../db/queries/tracked';
+import { getUnifiedPair } from '../db/queries/unified';
 import { getPerformanceWeights } from './performance';
 
 const router = Router();
