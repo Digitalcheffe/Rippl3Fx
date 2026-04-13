@@ -217,16 +217,18 @@ export async function backfillAccountStats(accountId: number, platform: string, 
           } catch { /* ignore */ }
         }
 
-        // Build daily rows
+        // Build daily rows — incremental metrics per day, cumulative only on today
+        const today = getLocalDate();
         for (let i = BACKFILL_DAYS; i >= 0; i--) {
           const d = new Date(Date.now() - i * 86_400_000);
           const date = getLocalDate(d);
+          const isToday = date === today;
           dailyData.push({
             date,
             lanes: {
               reach: viewsByDay[date] || 0,
-              interest: totalStars + totalWatchers,
-              engagement: totalForks + (clonesByDay[date] || 0) + totalReleaseDownloads,
+              interest: isToday ? totalStars + totalWatchers : 0, // cumulative only on today
+              engagement: (isToday ? totalForks : 0) + (clonesByDay[date] || 0) + (isToday ? totalReleaseDownloads : 0),
             },
           });
         }
