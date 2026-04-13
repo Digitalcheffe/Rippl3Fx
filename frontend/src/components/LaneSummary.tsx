@@ -76,23 +76,32 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
                 ) : null;
               })()}
             </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
-              {d.velocity !== 0 && (
-                <div style={{ fontSize: 12, color: vc, fontWeight: 700, fontFamily: font }}>
-                  {velArrow(d.velocity)} {velSign(d.velocity)}{fmt(Math.abs(d.velocity))}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginTop: 4 }}>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
+                <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font, marginTop: 2 }}>{timeLabel}</div>
+              </div>
+              {d.velocity !== 0 ? (
+                <>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: vc, fontFamily: font, lineHeight: 1 }}>
+                      {velSign(d.velocity)}{fmt(Math.abs(d.velocity))}
+                    </div>
+                    <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font, marginTop: 2 }}>change</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: vc, fontFamily: font, lineHeight: 1 }}>
+                      {(() => { const prev = d.current - d.velocity; return prev !== 0 ? `${d.velocity > 0 ? '+' : ''}${((d.velocity / prev) * 100).toFixed(1)}%` : 'new'; })()}
+                    </div>
+                    <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font, marginTop: 2 }}>% change</div>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: C.textFaint, fontFamily: font, lineHeight: 1 }}>--</div>
+                  <div style={{ fontSize: 9, color: C.textFaint, fontFamily: font, marginTop: 2 }}>no change</div>
                 </div>
               )}
-              {d.velocity !== 0 && (() => {
-                const prev = d.current - d.velocity;
-                const pctChange = prev !== 0 ? ((d.velocity / prev) * 100) : 0;
-                return (
-                  <div style={{ fontSize: 12, color: vc, fontWeight: 700, fontFamily: font }}>
-                    {pctChange > 0 ? '+' : ''}{pctChange.toFixed(1)}%
-                  </div>
-                );
-              })()}
-              {d.velocity === 0 && <div style={{ fontSize: 11, color: C.textFaint, fontFamily: font }}>No change</div>}
             </div>
           </div>
         );
