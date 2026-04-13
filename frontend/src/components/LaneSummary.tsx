@@ -66,19 +66,33 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
             cursor: onCardClick ? 'pointer' : 'default',
             transition: 'all 0.2s ease',
           }}>
-            <div style={{ fontSize: 10, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>{lane}<LaneTooltip lane={lane} platform={platform} /></div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontFamily: font }}>{lane}<LaneTooltip lane={lane} platform={platform} /></div>
               {peaks && (() => {
                 const peakKey = `${lane.toLowerCase()}_peak` as keyof typeof peaks;
                 const peakVal = peaks[peakKey] as number;
                 return peakVal > 0 ? (
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.textFaint, fontFamily: font }}>/ {fmt(peakVal)}</div>
+                  <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>Peak: {fmt(peakVal)}</div>
                 ) : null;
               })()}
             </div>
-            <div style={{ fontSize: 11, color: vc, fontWeight: 700, fontFamily: font, marginTop: 4 }}>
-              {d.velocity !== 0 ? `${velArrow(d.velocity)} ${velSign(d.velocity)}${fmt(Math.abs(d.velocity))} ${timeLabel}` : 'No change yet'}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
+              {d.velocity !== 0 && (
+                <div style={{ fontSize: 12, color: vc, fontWeight: 700, fontFamily: font }}>
+                  {velArrow(d.velocity)} {velSign(d.velocity)}{fmt(Math.abs(d.velocity))}
+                </div>
+              )}
+              {d.velocity !== 0 && (() => {
+                const prev = d.current - d.velocity;
+                const pctChange = prev !== 0 ? ((d.velocity / prev) * 100) : 0;
+                return (
+                  <div style={{ fontSize: 12, color: vc, fontWeight: 700, fontFamily: font }}>
+                    {pctChange > 0 ? '+' : ''}{pctChange.toFixed(1)}%
+                  </div>
+                );
+              })()}
+              {d.velocity === 0 && <div style={{ fontSize: 11, color: C.textFaint, fontFamily: font }}>No change</div>}
             </div>
           </div>
         );
