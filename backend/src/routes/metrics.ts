@@ -3,6 +3,7 @@ import { getTrackedItemsWithPlatform, getTagsForItem, getLatestSnapshot } from '
 import { getTrackedPair, getTrackedHistory } from '../db/queries/tracked';
 import { getUnifiedPair } from '../db/queries/unified';
 import { getPerformanceWeights } from './performance';
+import { getPeaks } from '../lanes/unify';
 
 const router = Router();
 
@@ -67,6 +68,8 @@ router.get('/dashboard', (req: Request, res: Response) => {
       interestHistory,
       engagementHistory,
       performanceHistory,
+      // Peak values for this item
+      peaks: getPeaks(ti.id, ti.platform, range === 'hourly' ? 'daily' : range),
     };
   });
 
@@ -125,6 +128,12 @@ router.get('/dashboard', (req: Request, res: Response) => {
     }
   }
 
+  // Add peak data to each platform
+  const effectiveRange = range === 'hourly' ? 'daily' : range;
+  for (const p of Object.keys(platforms)) {
+    platforms[p].peaks = getPeaks(null, p, effectiveRange);
+  }
+
   // Totals across all platforms (for lane cards)
   const totals = {
     reach: Object.values(platforms).reduce((s: number, p: any) => s + (p?.reach ?? 0), 0),
@@ -137,6 +146,11 @@ router.get('/dashboard', (req: Request, res: Response) => {
       engagement: Object.values(platforms).reduce((s: number, p: any) => s + (p?.velocity?.engagement ?? 0), 0),
     },
     performanceVelocity: Object.values(platforms).reduce((s: number, p: any) => s + (p?.performanceVelocity ?? 0), 0),
+    peaks: {
+      reach_peak: Object.values(platforms).reduce((s: number, p: any) => s + (p?.peaks?.reach_peak ?? 0), 0),
+      interest_peak: Object.values(platforms).reduce((s: number, p: any) => s + (p?.peaks?.interest_peak ?? 0), 0),
+      engagement_peak: Object.values(platforms).reduce((s: number, p: any) => s + (p?.peaks?.engagement_peak ?? 0), 0),
+    },
   };
 
   // Distribution % per lane (platform's share of total)

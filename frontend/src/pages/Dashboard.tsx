@@ -196,6 +196,7 @@ export default function Dashboard() {
             activeCard={activeChart}
             onCardClick={(lane) => setActiveChart(prev => prev === lane ? null : lane)}
             timeLabel={{ hourly: 'this hour', daily: 'today', weekly: 'this week', monthly: 'this month' }[timeRange]}
+            peaks={totals?.peaks}
           />
 
           {/* Collapsible chart panel */}

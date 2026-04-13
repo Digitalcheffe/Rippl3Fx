@@ -33,9 +33,10 @@ interface Props {
   onCardClick?: (lane: string) => void;
   timeLabel?: string;
   platform?: string;
+  peaks?: { reach_peak: number; interest_peak: number; engagement_peak: number } | null;
 }
 
-export default function LaneSummary({ items, performanceScore, performanceVelocity, weights, activeCard, onCardClick, timeLabel = 'today', platform }: Props) {
+export default function LaneSummary({ items, performanceScore, performanceVelocity, weights, activeCard, onCardClick, timeLabel = 'today', platform, peaks }: Props) {
   const totals: Record<string, LaneData> = {};
   for (const lane of LANES) {
     totals[lane] = {
@@ -66,7 +67,16 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
             transition: 'all 0.2s ease',
           }}>
             <div style={{ fontSize: 10, letterSpacing: 2, color: laneColor, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>{lane}<LaneTooltip lane={lane} platform={platform} /></div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{fmt(d.current)}</div>
+              {peaks && (() => {
+                const peakKey = `${lane.toLowerCase()}_peak` as keyof typeof peaks;
+                const peakVal = peaks[peakKey] as number;
+                return peakVal > 0 ? (
+                  <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font }}>peak: {fmt(peakVal)}</div>
+                ) : null;
+              })()}
+            </div>
             <div style={{ fontSize: 11, color: vc, fontWeight: 700, fontFamily: font, marginTop: 4 }}>
               {d.velocity !== 0 ? `${velArrow(d.velocity)} ${velSign(d.velocity)}${fmt(Math.abs(d.velocity))} ${timeLabel}` : 'No change yet'}
             </div>
