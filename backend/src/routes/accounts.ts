@@ -137,8 +137,19 @@ router.delete('/:id', (req: Request, res: Response) => {
 
   // Purge all tracked_metrics for items under this account
   const purged = purgeTrackedMetricsByAccount(id);
-  // Delete account (cascades to tracked_items and item_tags)
+  // Purge peak_metrics for items under this account
+  const dbConn = require('../db/connection').default;
+  dbConn.prepare('DELETE FROM peak_metrics WHERE tracked_item_id IN (SELECT id FROM tracked_items WHERE metric_account_id = ?)').run(id);
+  // Delete account (cascades to tracked_items and item_tags via deleteAccount)
   deleteAccount(id);
+  // Recalculate unified_metrics for the platform from remaining tracked_metrics
+  const platform = account.platform;
+  const remaining = dbConn.prepare("SELECT COUNT(*) as c FROM tracked_metrics WHERE platform = ?").get(platform) as any;
+  if (remaining.c === 0) {
+    // No data left for this platform — clear unified_metrics
+    dbConn.prepare('DELETE FROM unified_metrics WHERE platform = ?').run(platform);
+    dbConn.prepare('DELETE FROM peak_metrics WHERE platform = ? AND tracked_item_id IS NULL').run(platform);
+  }
 
   res.json({ success: true, message: `Account permanently deleted. ${purged} metric rows purged.` });
 });

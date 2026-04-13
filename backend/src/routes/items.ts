@@ -164,10 +164,20 @@ router.delete('/:id', (req: Request, res: Response) => {
   const item = getItemById(id);
   if (!item) { res.status(404).json({ error: 'Item not found' }); return; }
 
+  const account = getAccountById(item.metric_account_id);
+  const platform = account?.platform || '';
+
   // Purge tracked_metrics first (no CASCADE)
   const purged = purgeTrackedMetrics(id);
-  // Then delete the item itself (cascades item_tags)
+  // Then delete the item itself (cascades item_tags, snapshots, rollups, peak_metrics)
   deleteItem(id);
+
+  // If no tracked_metrics remain for this platform, clear unified_metrics too
+  const remaining = db.prepare("SELECT COUNT(*) as c FROM tracked_metrics WHERE platform = ?").get(platform) as any;
+  if (remaining.c === 0) {
+    db.prepare('DELETE FROM unified_metrics WHERE platform = ?').run(platform);
+    db.prepare('DELETE FROM peak_metrics WHERE platform = ? AND tracked_item_id IS NULL').run(platform);
+  }
 
   res.json({ success: true, message: `Item permanently deleted. ${purged} metric rows purged.` });
 });
