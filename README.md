@@ -56,15 +56,18 @@ That's it. Open `http://localhost:3000` and create your account on first run.
 
 The database, encryption keys, and JWT secrets are automatically generated and stored in the volume. Everything persists across restarts.
 
-### Building from Source
+### Environment Variables
 
-If you prefer to build the image yourself:
+All environment variables are **optional**. The app works out of the box with no configuration.
 
-```bash
-git clone https://github.com/Digitalcheffe/Rippl3Fx.git
-cd Rippl3Fx
-docker compose up --build
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENCRYPTION_KEY` | Auto-generated | Override the encryption key for platform credentials |
+| `JWT_SECRET` | Auto-generated | Override the JWT signing secret |
+| `PORT` | `3000` | Server port |
+| `TZ` | `UTC` | Timezone for rollups and date boundaries (e.g. `America/New_York`) |
+
+If `ENCRYPTION_KEY` or `JWT_SECRET` are not set, the app generates random secrets on first startup and stores them in `/data/config.json`. Setting env vars overrides the stored values.
 
 ### Data Persistence
 
@@ -82,18 +85,15 @@ volumes:
   - ./my-data:/data
 ```
 
-### Environment Variables
+### Building from Source
 
-All environment variables are **optional**. The app works out of the box with no configuration.
+If you prefer to build the image yourself:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ENCRYPTION_KEY` | Auto-generated | Override the encryption key for platform credentials |
-| `JWT_SECRET` | Auto-generated | Override the JWT signing secret |
-| `PORT` | `3000` | Server port |
-| `TZ` | `UTC` | Timezone for rollups and date boundaries (e.g. `America/New_York`) |
-
-If `ENCRYPTION_KEY` or `JWT_SECRET` are not set, the app generates random secrets on first startup and stores them in `/data/config.json`. Setting env vars overrides the stored values.
+```bash
+git clone https://github.com/Digitalcheffe/Rippl3Fx.git
+cd Rippl3Fx
+docker compose up --build
+```
 
 ## Development
 
