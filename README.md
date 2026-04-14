@@ -9,11 +9,12 @@ Mark events (launches, posts, releases) and watch the ripple spread across your 
 ```bash
 git clone https://github.com/Digitalcheffe/Rippl3Fx.git
 cd Rippl3Fx
-cp .env.example .env    # Fill in ENCRYPTION_KEY and JWT_SECRET
 docker compose up --build
 ```
 
-Open `http://localhost:3000` and create your account on first run.
+That's it. Open `http://localhost:3000` and create your account on first run.
+
+The database, encryption keys, and JWT secrets are automatically generated and stored in the Docker volume. Everything persists across restarts.
 
 ## Features
 
@@ -22,6 +23,23 @@ Open `http://localhost:3000` and create your account on first run.
 - **Platform polling** — automated data collection with configurable intervals
 - **Hourly, daily, weekly, monthly** time ranges with velocity tracking
 - **Docker deployment** — single image, SQLite database, zero external dependencies
+- **Zero config** — secrets auto-generated on first run, no `.env` required
+
+## Data Persistence
+
+All data lives in `/data` inside the container:
+
+| File | Purpose |
+|------|---------|
+| `/data/rippl3fx.db` | SQLite database (accounts, metrics, events) |
+| `/data/config.json` | Auto-generated encryption key and JWT secret |
+
+The default `docker-compose.yml` mounts a named volume to `/data`. To use a local directory instead:
+
+```yaml
+volumes:
+  - ./my-data:/data
+```
 
 ## Platform Setup
 
@@ -35,14 +53,16 @@ By default, weekly metrics use Monday as the first day of the week. Change this 
 
 ## Environment Variables
 
-```env
-ENCRYPTION_KEY=   # Any string — used to encrypt stored credentials (AES-256)
-JWT_SECRET=       # Any string — used to sign auth tokens
-PORT=3000         # Server port (default 3000)
-DB_PATH=          # SQLite path (default ./data/rippl3fx.db)
-```
+All environment variables are **optional**. The app works out of the box with no configuration.
 
-Copy `.env.example` to `.env` and fill in your values before running.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENCRYPTION_KEY` | Auto-generated | Override the encryption key for platform credentials |
+| `JWT_SECRET` | Auto-generated | Override the JWT signing secret |
+| `PORT` | `3000` | Server port |
+| `TZ` | `UTC` | Timezone for rollups (e.g. `America/New_York`) |
+
+If `ENCRYPTION_KEY` or `JWT_SECRET` are not set, the app generates random secrets on first startup and stores them in `/data/config.json`. They persist across restarts via the volume. Setting env vars overrides the stored values.
 
 ## Development
 

@@ -4,12 +4,13 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - rippl3fx-data:/app/data
+      - rippl3fx-data:/data
     environment:
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - JWT_SECRET=${JWT_SECRET}
-      - PORT=3000
-      - DB_PATH=/app/data/rippl3fx.db
+      - DATA_DIR=/data
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - PORT=${PORT:-3000}
+      - TZ=${TZ:-}
 
 volumes:
   rippl3fx-data:
