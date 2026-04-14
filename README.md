@@ -31,6 +31,10 @@ See [docs/account-setup.md](docs/account-setup.md) for step-by-step instructions
 
 By default, weekly metrics use Monday as the first day of the week. Change this in **Settings → Profile → Week Starts On** to any day (Sunday through Saturday). All weekly rollups, chart boundaries, and date labels will align to your preference.
 
+## First Run
+
+Rippl3FX is a **single-user application** — there are no teams, invitations, or multi-user accounts. On first launch, you'll be prompted to create your username and password. This is the only account and cannot be changed to multi-user later. Optional TOTP two-factor authentication can be enabled in Settings after setup.
+
 ## Quick Start — Docker
 
 The database, encryption keys, and JWT secrets are automatically generated and stored in the volume. Everything persists across restarts — no `.env` file needed.
