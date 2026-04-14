@@ -6,9 +6,11 @@ import { getPerformanceWeights } from './performance';
 import { getPeaks } from '../lanes/unify';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { apiLimiter } from '../middleware/rateLimiter';
+import { doubleCsrfProtection } from '../middleware/csrf';
 
 const router = Router();
 router.use(apiLimiter);
+router.use(doubleCsrfProtection);
 
 // GET /api/dashboard?tag=NORA&range=daily
 router.get('/dashboard', asyncHandler((req: Request, res: Response) => {

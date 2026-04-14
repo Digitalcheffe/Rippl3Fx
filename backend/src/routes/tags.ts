@@ -3,9 +3,11 @@ import { getAllTags, getTagById, getTagByName, createTag, deleteTag, getTagsForI
 import { getItemById } from '../db/queries/items';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { apiLimiter } from '../middleware/rateLimiter';
+import { doubleCsrfProtection } from '../middleware/csrf';
 
 const router = Router();
 router.use(apiLimiter);
+router.use(doubleCsrfProtection);
 
 // GET /api/tags
 router.get('/', asyncHandler((_req: Request, res: Response) => {
