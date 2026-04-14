@@ -4,11 +4,12 @@ import { getTrackedPair, getTrackedHistory, getHourlyPair, getHourlyHistory } fr
 import { getUnifiedPair, getUnifiedHistory, getUnifiedHourlyPair, getUnifiedHourlyHistory } from '../db/queries/unified';
 import { getPerformanceWeights } from './performance';
 import { getPeaks } from '../lanes/unify';
+import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
 
 // GET /api/dashboard?tag=NORA&range=daily
-router.get('/dashboard', (req: Request, res: Response) => {
+router.get('/dashboard', asyncHandler((req: Request, res: Response) => {
   const tagFilter = req.query.tag as string | undefined;
   const range = (req.query.range as string) || 'daily';
   const trackedItems = getTrackedItemsWithPlatform(tagFilter);
@@ -225,10 +226,10 @@ router.get('/dashboard', (req: Request, res: Response) => {
   }
 
   res.json({ items, platforms, totals, distribution, weights });
-});
+}));
 
 // POST /api/dashboard/recalculate — rebuild all tracked_metrics, unified_metrics, peaks from daily platform tables
-router.post('/recalculate', (_req: Request, res: Response) => {
+router.post('/recalculate', asyncHandler((_req: Request, res: Response) => {
   const db = require('../db/connection').default;
   const { writeMetrics } = require('../lanes/unify');
   const { setPreviousBaseline } = require('../lanes/calc');
@@ -312,6 +313,6 @@ router.post('/recalculate', (_req: Request, res: Response) => {
 
   console.log(`[Recalculate] Complete — ${totalRows} daily rows, ${weekCount} weeks, ${monthCount} months`);
   res.json({ success: true, dailyRows: totalRows, weeks: weekCount, months: monthCount });
-});
+}));
 
 export default router;

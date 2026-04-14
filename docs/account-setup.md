@@ -1,25 +1,5 @@
 # Platform Setup
 
-## Reddit
-
-Create a Reddit app to get API credentials.
-
-**If you sign in to Reddit with Google/Apple:** Reddit's API requires a username and password. To add a password to your account, go to https://www.reddit.com/password, enter your Reddit email, and use the reset link to create a password. Your Google SSO login will continue to work alongside the new password.
-
-1. Go to https://www.reddit.com/prefs/apps
-2. Click **"create another app..."** at the bottom
-3. Fill in:
-   - **Name:** Rippl3FX (or anything)
-   - **Type:** Select **script**
-   - **Redirect URI:** `http://localhost:3000` (not used, but required)
-4. Click **Create app**
-5. Note down:
-   - **Client ID** — the string under the app name (e.g. `a1b2c3d4e5f6g7`)
-   - **Client Secret** — labeled "secret"
-6. In Rippl3FX Settings → Accounts → Connect Reddit, enter:
-   - Your Reddit **username** and **password**
-   - The **Client ID** and **Client Secret** from above
-
 ## GitHub
 
 Create a Personal Access Token (classic) for API access. Rippl3FX reads repo stats (stars, forks, issues), traffic views/uniques, and clone counts. Traffic and clone data require **push access** to the repo — this only works for your own repos.

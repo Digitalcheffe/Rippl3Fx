@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ripple Index Mockup — Rippl3FX</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #eef4fb; color: #0d1f35; font-family: 'DM Mono', monospace; padding: 28px; }
+
+  .nav { background: #1e3a5f; padding: 0 28px; height: 52px; display: flex; align-items: center; gap: 24px; border-radius: 10px; margin-bottom: 28px; box-shadow: 0 2px 12px rgba(13,31,53,0.18); }
+  .nav .logo span:nth-child(1) { color: #e8622a; font-weight: 900; font-size: 15px; }
+  .nav .logo span:nth-child(2) { color: #e6a817; font-weight: 900; font-size: 15px; }
+  .nav .logo span:nth-child(3) { color: #fff; font-weight: 900; font-size: 15px; }
+  .nav-btn { padding: 5px 12px; background: none; border: none; border-radius: 6px; color: rgba(255,255,255,0.5); font-size: 11px; font-family: inherit; cursor: pointer; letter-spacing: 0.3px; border-bottom: 2px solid transparent; }
+  .nav-btn.active { background: rgba(255,255,255,0.1); color: #fff; font-weight: 700; border-bottom-color: #e8622a; }
+
+  h1 { font-size: 20px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: #5a7fa8; margin-bottom: 16px; }
+  hr { border: none; border-top: 2px solid #cfe0f0; margin: 0 0 20px; }
+
+  /* ---- Ripple Index Ring ---- */
+  .ring-container { display: flex; align-items: center; gap: 20px; }
+  .ring-wrap { position: relative; width: 120px; height: 120px; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: #cfe0f0; stroke-width: 8; }
+  .ring-fg { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 1s ease, stroke 0.5s; }
+  .ring-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+  .ring-value { font-size: 28px; font-weight: 900; line-height: 1; }
+  .ring-caption { font-size: 9px; color: #5a7fa8; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+
+  .ring-meta { display: flex; flex-direction: column; gap: 6px; }
+  .ring-meta-row { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .ring-meta-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ring-meta-bar { height: 6px; border-radius: 3px; min-width: 4px; transition: width 0.8s ease; }
+  .ring-meta-val { font-weight: 700; min-width: 28px; text-align: right; }
+
+  /* ---- Event Cards ---- */
+  .event-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin-top: 20px; }
+  .event-card { background: #f8fbff; border: 1px solid #cfe0f0; border-radius: 12px; padding: 16px 20px; transition: box-shadow 0.15s; }
+  .event-card:hover { box-shadow: 0 2px 12px rgba(13,31,53,0.08); }
+  .event-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .event-name { font-size: 14px; font-weight: 700; }
+  .event-date { font-size: 10px; color: #5a7fa8; margin-top: 2px; }
+  .event-tag { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; background: #e8622a18; color: #e8622a; }
+
+  /* Sparkline area */
+  .decay-chart { margin: 8px 0 12px; }
+  .decay-chart svg { display: block; }
+
+  /* Lane breakdown row */
+  .lane-row { display: flex; gap: 8px; margin-top: 8px; }
+  .lane-pill { flex: 1; background: #e8f0f9; border-radius: 8px; padding: 8px 10px; text-align: center; }
+  .lane-pill-label { font-size: 9px; color: #5a7fa8; text-transform: uppercase; letter-spacing: 1px; }
+  .lane-pill-val { font-size: 16px; font-weight: 900; margin-top: 2px; }
+
+  /* ---- Dashboard Ripple Summary ---- */
+  .ripple-summary { background: #f8fbff; border: 1px solid #e8622a30; border-top: 3px solid #e8622a; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; }
+  .ripple-summary-title { font-size: 10px; letter-spacing: 3px; color: #e8622a; text-transform: uppercase; margin-bottom: 12px; }
+  .ripple-events-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .ripple-mini { display: flex; align-items: center; gap: 10px; background: #eef4fb; border-radius: 10px; padding: 10px 14px; min-width: 200px; }
+  .ripple-mini-ring { position: relative; width: 44px; height: 44px; flex-shrink: 0; }
+  .ripple-mini-ring svg { transform: rotate(-90deg); }
+  .mini-ring-bg { fill: none; stroke: #cfe0f0; stroke-width: 4; }
+  .mini-ring-fg { fill: none; stroke-width: 4; stroke-linecap: round; }
+  .ripple-mini-val { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; font-weight: 900; }
+  .ripple-mini-info { display: flex; flex-direction: column; gap: 1px; }
+  .ripple-mini-name { font-size: 11px; font-weight: 700; }
+  .ripple-mini-date { font-size: 9px; color: #5a7fa8; }
+  .ripple-mini-trend { font-size: 10px; font-weight: 600; }
+  .trend-down { color: #e8380d; }
+  .trend-up { color: #0d9488; }
+
+  .section-label { font-size: 11px; letter-spacing: 2px; color: #2d5282; text-transform: uppercase; margin-bottom: 6px; }
+  .mockup-note { font-size: 10px; color: #5a7fa8; background: #e8f0f9; border-radius: 6px; padding: 8px 12px; margin-top: 20px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<div class="nav">
+  <div class="logo"><span>Rippl</span><span>3</span><span>FX</span></div>
+  <button class="nav-btn">All Metrics</button>
+  <button class="nav-btn active">Events</button>
+  <button class="nav-btn">GitHub</button>
+  <button class="nav-btn">GA4</button>
+  <button class="nav-btn">Bing</button>
+</div>
+
+<!-- Page Header -->
+<h1>Events</h1>
+<p class="subtitle">Mark moments that create ripples. Track how far each one spreads.</p>
+<hr>
+
+<!-- ============================================================ -->
+<!-- SECTION 1: Events Page — Event Cards with Ripple Index       -->
+<!-- ============================================================ -->
+
+<div class="section-label">Active Ripples</div>
+
+<div class="event-grid">
+
+  <!-- Event Card 1: Strong ripple -->
+  <div class="event-card">
+    <div class="event-header">
+      <div>
+        <div class="event-name">N.O.R.A v2.0 Release</div>
+        <div class="event-date">Apr 10, 2026 · Day 4</div>
+      </div>
+      <span class="event-tag">N.O.R.A</span>
+    </div>
+
+    <div class="ring-container">
+      <div class="ring-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle class="ring-bg" cx="60" cy="60" r="50" />
+          <circle class="ring-fg" cx="60" cy="60" r="50"
+            stroke="#0d9488"
+            stroke-dasharray="314"
+            stroke-dashoffset="86" />
+        </svg>
+        <div class="ring-label">
+          <div class="ring-value" style="color: #0d9488">72</div>
+          <div class="ring-caption">Ripple</div>
+        </div>
+      </div>
+      <div class="ring-meta">
+        <div class="ring-meta-row">
+          <div class="ring-meta-dot" style="background:#0969da"></div>
+          <span style="color:#5a7fa8; min-width:70px">Reach</span>
+          <div class="ring-meta-bar" style="width:55px; background:#0969da"></div>
+          <span class="ring-meta-val">55</span>
+        </div>
+        <div class="ring-meta-row">
+          <div class="ring-meta-dot" style="background:#0d9488"></div>
+          <span style="color:#5a7fa8; min-width:70px">Interest</span>
+          <div class="ring-meta-bar" style="width:82px; background:#0d9488"></div>
+          <span class="ring-meta-val">82</span>
+        </div>
+        <div class="ring-meta-row">
+          <div class="ring-meta-dot" style="background:#e8380d"></div>
+          <span style="color:#5a7fa8; min-width:70px">Engagement</span>
+          <div class="ring-meta-bar" style="width:74px; background:#e8380d"></div>
+          <span class="ring-meta-val">74</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Decay sparkline -->
+    <div class="decay-chart">
+      <svg width="100%" height="40" viewBox="0 0 300 40" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0d9488" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#0d9488" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,38 L50,30 L100,5 L150,2 L200,10 L250,16 L300,22" fill="none" stroke="#0d9488" stroke-width="2"/>
+        <path d="M0,38 L50,30 L100,5 L150,2 L200,10 L250,16 L300,22 L300,40 L0,40 Z" fill="url(#g1)"/>
+        <!-- Event marker -->
+        <line x1="100" y1="0" x2="100" y2="40" stroke="#e8622a" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.7"/>
+        <circle cx="100" cy="3" r="3" fill="#e8622a"/>
+        <circle cx="300" cy="22" r="3.5" fill="#0d9488"/>
+      </svg>
+      <div style="display:flex; justify-content:space-between; font-size:8px; color:#5a7fa8; margin-top:2px;">
+        <span>Apr 7</span>
+        <span style="color:#e8622a; font-weight:700">↑ Event</span>
+        <span>Today</span>
+      </div>
+    </div>
+
+    <div class="lane-row">
+      <div class="lane-pill">
+        <div class="lane-pill-label">Peak Day</div>
+        <div class="lane-pill-val" style="color:#0d9488">Day 2</div>
+      </div>
+      <div class="lane-pill">
+        <div class="lane-pill-label">Days Active</div>
+        <div class="lane-pill-val" style="color:#2d5282">4</div>
+      </div>
+      <div class="lane-pill">
+        <div class="lane-pill-label">Trend</div>
+        <div class="lane-pill-val trend-down">↓ Fading</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Event Card 2: Weak/fading ripple -->
+  <div class="event-card">
+    <div class="event-header">
+      <div>
+        <div class="event-name">4LeafClover Reddit Post</div>
+        <div class="event-date">Apr 3, 2026 · Day 11</div>
+      </div>
+      <span class="event-tag">4LeafClover</span>
+    </div>
+
+    <div class="ring-container">
+      <div class="ring-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle class="ring-bg" cx="60" cy="60" r="50" />
+          <circle class="ring-fg" cx="60" cy="60" r="50"
+            stroke="#e8380d"
+            stroke-dasharray="314"
+            stroke-dashoffset="270" />
+        </svg>
+        <div class="ring-label">
+          <div class="ring-value" style="color: #e8380d">14</div>
+          <div class="ring-caption">Ripple</div>
+        </div>
+      </div>
+      <div class="ring-meta">
+        <div class="ring-meta-row">
+          <div class="ring-meta-dot" style="background:#0969da"></div>
+          <span style="color:#5a7fa8; min-width:70px">Reach</span>
+          <div class="ring-meta-bar" style="width:10px; background:#0969da"></div>
+          <span class="ring-meta-val">8</span>
+        </div>
+        <div class="ring-meta-row">
+          <div class="ring-meta-dot" style="background:#0d9488"></div>
+          <span style="color:#5a7fa8; min-width:70px">Interest</span>
+          <div class="ring-meta-bar" style="width:20px; background:#0d9488"></div>
+          <span class="ring-meta-val">18</span>
+        </div>
+        <div class="ring-meta-row">
+          <div class="ring-meta-dot" style="background:#e8380d"></div>
+          <span style="color:#5a7fa8; min-width:70px">Engagement</span>
+          <div class="ring-meta-bar" style="width:15px; background:#e8380d"></div>
+          <span class="ring-meta-val">14</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="decay-chart">
+      <svg width="100%" height="40" viewBox="0 0 300 40" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#e8380d" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="#e8380d" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,36 L30,28 L60,5 L90,3 L120,12 L150,22 L180,28 L210,32 L240,34 L270,36 L300,37" fill="none" stroke="#e8380d" stroke-width="2"/>
+        <path d="M0,36 L30,28 L60,5 L90,3 L120,12 L150,22 L180,28 L210,32 L240,34 L270,36 L300,37 L300,40 L0,40 Z" fill="url(#g2)"/>
+        <line x1="60" y1="0" x2="60" y2="40" stroke="#e8622a" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.7"/>
+        <circle cx="60" cy="3" r="3" fill="#e8622a"/>
+        <circle cx="300" cy="37" r="3.5" fill="#e8380d"/>
+      </svg>
+      <div style="display:flex; justify-content:space-between; font-size:8px; color:#5a7fa8; margin-top:2px;">
+        <span>Apr 1</span>
+        <span style="color:#e8622a; font-weight:700">↑ Event</span>
+        <span>Today</span>
+      </div>
+    </div>
+
+    <div class="lane-row">
+      <div class="lane-pill">
+        <div class="lane-pill-label">Peak Day</div>
+        <div class="lane-pill-val" style="color:#e8380d">Day 2</div>
+      </div>
+      <div class="lane-pill">
+        <div class="lane-pill-label">Days Active</div>
+        <div class="lane-pill-val" style="color:#2d5282">11</div>
+      </div>
+      <div class="lane-pill">
+        <div class="lane-pill-label">Trend</div>
+        <div class="lane-pill-val trend-down">↓ Absorbed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Event Card 3: Fresh spike -->
+  <div class="event-card">
+    <div class="event-header">
+      <div>
+        <div class="event-name">Blog: Why I Built Rippl3FX</div>
+        <div class="event-date">Apr 13, 2026 · Day 1</div>
+      </div>
+      <span class="event-tag">Rippl3Fx</span>
+    </div>
+
+    <div class="ring-container">
+      <div class="ring-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle class="ring-bg" cx="60" cy="60" r="50" />
+          <circle class="ring-fg" cx="60" cy="60" r="50"
+            stroke="#0d9488"
+            stroke-dasharray="314"
+            stroke-dashoffset="16" />
+        </svg>
+        <div class="ring-label">
+          <div class="ring-value" style="color: #0d9488">95</div>
+          <div class="ring-caption">Ripple</div>
+        </div>
+      </div>
+      <div class="ring-meta">
+        <div class="ring-meta-row">
+          <div class="ring-meta-dot" style="background:#0969da"></div>
+          <span style="color:#5a7fa8; min-width:70px">Reach</span>
+          <div class="ring-meta-bar" style="width:92px; background:#0969da"></div>
+          <span class="ring-meta-val">92</span>
+        </div>
+        <div class="ring-meta-row">
+          <div class="ring-meta-dot" style="background:#0d9488"></div>
+          <span style="color:#5a7fa8; min-width:70px">Interest</span>
+          <div class="ring-meta-bar" style="width:100px; background:#0d9488"></div>
+          <span class="ring-meta-val">100</span>
+        </div>
+        <div class="ring-meta-row">
+          <div class="ring-meta-dot" style="background:#e8380d"></div>
+          <span style="color:#5a7fa8; min-width:70px">Engagement</span>
+          <div class="ring-meta-bar" style="width:90px; background:#e8380d"></div>
+          <span class="ring-meta-val">90</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="decay-chart">
+      <svg width="100%" height="40" viewBox="0 0 300 40" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0d9488" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#0d9488" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,36 L75,34 L150,30 L200,15 L250,4 L300,3" fill="none" stroke="#0d9488" stroke-width="2"/>
+        <path d="M0,36 L75,34 L150,30 L200,15 L250,4 L300,3 L300,40 L0,40 Z" fill="url(#g3)"/>
+        <line x1="200" y1="0" x2="200" y2="40" stroke="#e8622a" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.7"/>
+        <circle cx="200" cy="3" r="3" fill="#e8622a"/>
+        <circle cx="300" cy="3" r="3.5" fill="#0d9488"/>
+      </svg>
+      <div style="display:flex; justify-content:space-between; font-size:8px; color:#5a7fa8; margin-top:2px;">
+        <span>Apr 10</span>
+        <span style="color:#e8622a; font-weight:700">↑ Event</span>
+        <span>Today</span>
+      </div>
+    </div>
+
+    <div class="lane-row">
+      <div class="lane-pill">
+        <div class="lane-pill-label">Peak Day</div>
+        <div class="lane-pill-val" style="color:#0d9488">Today</div>
+      </div>
+      <div class="lane-pill">
+        <div class="lane-pill-label">Days Active</div>
+        <div class="lane-pill-val" style="color:#2d5282">1</div>
+      </div>
+      <div class="lane-pill">
+        <div class="lane-pill-label">Trend</div>
+        <div class="lane-pill-val trend-up">↑ Spiking</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 2: How this looks on the Dashboard (mini ripple row) -->
+<!-- ============================================================ -->
+
+<div style="margin-top: 40px;">
+  <div class="section-label" style="margin-bottom: 4px;">How it appears on the Dashboard</div>
+  <p class="subtitle">A compact ripple summary row replaces the old Performance Score card.</p>
+
+  <div class="ripple-summary">
+    <div class="ripple-summary-title">Active Ripples</div>
+    <div class="ripple-events-row">
+
+      <div class="ripple-mini">
+        <div class="ripple-mini-ring">
+          <svg width="44" height="44" viewBox="0 0 44 44">
+            <circle class="mini-ring-bg" cx="22" cy="22" r="18" />
+            <circle class="mini-ring-fg" cx="22" cy="22" r="18" stroke="#0d9488" stroke-dasharray="113" stroke-dashoffset="6" style="transform:rotate(-90deg);transform-origin:center"/>
+          </svg>
+          <div class="ripple-mini-val" style="color:#0d9488">95</div>
+        </div>
+        <div class="ripple-mini-info">
+          <div class="ripple-mini-name">Blog: Why I Built Rippl3FX</div>
+          <div class="ripple-mini-date">Day 1 · Apr 13</div>
+          <div class="ripple-mini-trend trend-up">↑ Spiking</div>
+        </div>
+      </div>
+
+      <div class="ripple-mini">
+        <div class="ripple-mini-ring">
+          <svg width="44" height="44" viewBox="0 0 44 44">
+            <circle class="mini-ring-bg" cx="22" cy="22" r="18" />
+            <circle class="mini-ring-fg" cx="22" cy="22" r="18" stroke="#0d9488" stroke-dasharray="113" stroke-dashoffset="32" style="transform:rotate(-90deg);transform-origin:center"/>
+          </svg>
+          <div class="ripple-mini-val" style="color:#0d9488">72</div>
+        </div>
+        <div class="ripple-mini-info">
+          <div class="ripple-mini-name">N.O.R.A v2.0 Release</div>
+          <div class="ripple-mini-date">Day 4 · Apr 10</div>
+          <div class="ripple-mini-trend trend-down">↓ Fading</div>
+        </div>
+      </div>
+
+      <div class="ripple-mini">
+        <div class="ripple-mini-ring">
+          <svg width="44" height="44" viewBox="0 0 44 44">
+            <circle class="mini-ring-bg" cx="22" cy="22" r="18" />
+            <circle class="mini-ring-fg" cx="22" cy="22" r="18" stroke="#e8380d" stroke-dasharray="113" stroke-dashoffset="97" style="transform:rotate(-90deg);transform-origin:center"/>
+          </svg>
+          <div class="ripple-mini-val" style="color:#e8380d">14</div>
+        </div>
+        <div class="ripple-mini-info">
+          <div class="ripple-mini-name">4LeafClover Reddit Post</div>
+          <div class="ripple-mini-date">Day 11 · Apr 3</div>
+          <div class="ripple-mini-trend trend-down">↓ Absorbed</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 3: Color coding legend                               -->
+<!-- ============================================================ -->
+
+<div style="margin-top: 20px;">
+  <div class="section-label">Ripple Index Scale</div>
+  <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;">
+      <div style="width:12px;height:12px;border-radius:50%;background:#0d9488"></div>
+      <span><b>70–100</b> — Strong ripple</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;">
+      <div style="width:12px;height:12px;border-radius:50%;background:#e6a817"></div>
+      <span><b>30–69</b> — Moderate ripple</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;">
+      <div style="width:12px;height:12px;border-radius:50%;background:#e8380d"></div>
+      <span><b>1–29</b> — Fading ripple</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;">
+      <div style="width:12px;height:12px;border-radius:50%;background:#cfe0f0"></div>
+      <span><b>0</b> — Absorbed (back to baseline)</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 4: Trend labels explained                            -->
+<!-- ============================================================ -->
+
+<div style="margin-top: 20px;">
+  <div class="section-label">Trend Labels</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; margin-top:8px;">
+    <div style="font-size:11px;"><span class="trend-up" style="font-weight:700">↑ Spiking</span> — still climbing toward peak</div>
+    <div style="font-size:11px;"><span style="color:#e6a817;font-weight:700">→ Plateau</span> — holding near peak</div>
+    <div style="font-size:11px;"><span class="trend-down" style="font-weight:700">↓ Fading</span> — declining from peak</div>
+    <div style="font-size:11px;"><span class="trend-down" style="font-weight:700">↓ Absorbed</span> — near baseline, ripple over</div>
+  </div>
+</div>
+
+<div class="mockup-note" style="margin-top: 24px;">
+  <b>Mockup notes:</b> This is a static HTML mockup showing the Ripple Index concept. Each event gets a 0–100 score based on how far above baseline each lane currently is, relative to the peak lift observed since the event. The ring color shifts from green (strong) → yellow (moderate) → red (fading) → gray (absorbed). The decay sparkline shows the ripple curve over time with the event marker. The dashboard row gives a quick "wake up and glance" summary of all active ripples.
+</div>
+
+</body>
+</html>

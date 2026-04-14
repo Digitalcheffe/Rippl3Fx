@@ -3,26 +3,27 @@ import db from '../db/connection';
 import { getItemsByAccount, getItemById, getAllItems, createItem, updateItem, deleteItem } from '../db/queries/items';
 import { getAccountById } from '../db/queries/accounts';
 import { purgeTrackedMetrics } from '../db/queries/tracked';
+import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
 
 // GET /api/items
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', asyncHandler((_req: Request, res: Response) => {
   res.json(getAllItems());
-});
+}));
 
 // GET /api/items/:id
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', asyncHandler((req: Request, res: Response) => {
   const item = getItemById(Number(req.params.id));
   if (!item) {
     res.status(404).json({ error: 'Item not found' });
     return;
   }
   res.json(item);
-});
+}));
 
 // GET /api/accounts/:accountId/items
-router.get('/by-account/:accountId', (req: Request, res: Response) => {
+router.get('/by-account/:accountId', asyncHandler((req: Request, res: Response) => {
   const accountId = Number(req.params.accountId);
   const account = getAccountById(accountId);
   if (!account) {
@@ -30,10 +31,10 @@ router.get('/by-account/:accountId', (req: Request, res: Response) => {
     return;
   }
   res.json(getItemsByAccount(accountId));
-});
+}));
 
 // POST /api/items
-router.post('/', (req: Request, res: Response) => {
+router.post('/', asyncHandler((req: Request, res: Response) => {
   const { metric_account_id, platform_identifier, display_name } = req.body;
 
   if (!metric_account_id || typeof metric_account_id !== 'number') {
@@ -64,10 +65,10 @@ router.post('/', (req: Request, res: Response) => {
   import('../backfill/historical').then(({ runHistoricalBackfill }) => {
     runHistoricalBackfill(item.id, metric_account_id, account.platform, platform_identifier);
   }).catch(err => console.error(`[Backfill] Import failed: ${err.message}`));
-});
+}));
 
 // PUT /api/items/:id
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', asyncHandler((req: Request, res: Response) => {
   const id = Number(req.params.id);
   const existing = getItemById(id);
   if (!existing) {
@@ -100,10 +101,10 @@ router.put('/:id', (req: Request, res: Response) => {
 
   const item = updateItem(id, updates);
   res.json(item);
-});
+}));
 
 // POST /api/items/:id/backfill — trigger 14-day historical data pull
-router.post('/:id/backfill', async (req: Request, res: Response) => {
+router.post('/:id/backfill', asyncHandler(async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const item = getItemById(id);
   if (!item) {
@@ -123,10 +124,10 @@ router.post('/:id/backfill', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error(`[Backfill] Manual trigger failed for item ${id}: ${err.message}`);
   }
-});
+}));
 
 // POST /api/items/:id/untrack — soft-delete: stop polling, clear tags, preserve metrics
-router.post('/:id/untrack', (req: Request, res: Response) => {
+router.post('/:id/untrack', asyncHandler((req: Request, res: Response) => {
   const id = Number(req.params.id);
   const item = getItemById(id);
   if (!item) { res.status(404).json({ error: 'Item not found' }); return; }
@@ -137,10 +138,10 @@ router.post('/:id/untrack', (req: Request, res: Response) => {
   db.prepare('DELETE FROM item_tags WHERE tracked_item_id = ?').run(id);
 
   res.json({ success: true, message: 'Item untracked. Metrics preserved.' });
-});
+}));
 
 // POST /api/items/:id/retrack — re-enable tracking
-router.post('/:id/retrack', (req: Request, res: Response) => {
+router.post('/:id/retrack', asyncHandler((req: Request, res: Response) => {
   const id = Number(req.params.id);
   const item = getItemById(id);
   if (!item) { res.status(404).json({ error: 'Item not found' }); return; }
@@ -156,10 +157,10 @@ router.post('/:id/retrack', (req: Request, res: Response) => {
   }
 
   res.json({ success: true, message: 'Item re-tracked.' });
-});
+}));
 
 // DELETE /api/items/:id — permanent delete: purges item + all tracked_metrics
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', asyncHandler((req: Request, res: Response) => {
   const id = Number(req.params.id);
   const item = getItemById(id);
   if (!item) { res.status(404).json({ error: 'Item not found' }); return; }
@@ -180,6 +181,6 @@ router.delete('/:id', (req: Request, res: Response) => {
   }
 
   res.json({ success: true, message: `Item permanently deleted. ${purged} metric rows purged.` });
-});
+}));
 
 export default router;

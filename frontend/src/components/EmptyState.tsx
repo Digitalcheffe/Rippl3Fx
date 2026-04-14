@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { C } from '../theme';
 
 const font = "'DM Mono', monospace";
-const PLATFORM_ICONS: Record<string, string> = { Reddit: 'R', GitHub: 'G', GA4: 'A', Bing: 'B' };
+const PLATFORM_ICONS: Record<string, string> = { GitHub: 'G', GA4: 'A', Bing: 'B' };
 
 export default function EmptyState({ platform }: { platform: string }) {
   const navigate = useNavigate();

@@ -29,16 +29,11 @@ const btn: React.CSSProperties = {
   cursor: 'pointer', letterSpacing: 0.3,
 };
 
-function formatDate(iso: string): string {
-  const d = new Date(iso + (iso.includes('T') ? '' : 'T12:00:00'));
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-}
-
 export default function Events() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -63,7 +58,7 @@ export default function Events() {
       );
       setEvents(withTags);
     } catch (err) {
-      console.error('Failed to load events', err);
+      setError('Failed to load events');
     } finally {
       setLoading(false);
     }
@@ -107,9 +102,10 @@ export default function Events() {
           tag_ids: formTagIds,
         });
       }
+      setError(null);
       resetForm();
       fetchEvents();
-    } catch (err) { console.error('Failed to save event', err); }
+    } catch (err) { setError('Failed to save event'); }
   };
 
   const handleEdit = (e: EventItem) => {
@@ -123,8 +119,8 @@ export default function Events() {
   };
 
   const handleDelete = async (id: number) => {
-    try { await apiDelete(`/events/${id}`); fetchEvents(); }
-    catch (err) { console.error('Failed to delete event', err); }
+    try { setError(null); await apiDelete(`/events/${id}`); fetchEvents(); }
+    catch (err) { setError('Failed to delete event'); }
   };
 
   const toggleTag = (tagId: number) => {
@@ -151,6 +147,12 @@ export default function Events() {
         Mark moments that create ripples. Events appear as markers on your charts.
       </p>
       <hr style={{ border: 'none', borderTop: `2px solid ${C.border}`, margin: '0 0 20px' }} />
+
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#991b1b', fontFamily: font }}>
+          {error}
+        </div>
+      )}
 
       {/* Create / Edit Form */}
       {showForm && (

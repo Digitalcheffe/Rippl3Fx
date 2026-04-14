@@ -3,12 +3,13 @@ import { Octokit } from '@octokit/rest';
 import axios from 'axios';
 import db from '../db/connection';
 import { decryptCredentials } from '../crypto/credentials';
+import { asyncHandler } from '../middleware/asyncHandler';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 
 const router = Router();
 
 // GET /api/accounts/:id/discover — list browsable content for an account
-router.get('/:id/discover', async (req: Request, res: Response) => {
+router.get('/:id/discover', asyncHandler(async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const account = db.prepare('SELECT * FROM metric_accounts WHERE id = ?').get(id) as any;
   if (!account) {
@@ -138,10 +139,10 @@ router.get('/:id/discover', async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: `Discovery failed: ${err.message}` });
   }
-});
+}));
 
 // GET /api/accounts/:id/stats — account-level overview stats
-router.get('/:id/stats', async (req: Request, res: Response) => {
+router.get('/:id/stats', asyncHandler(async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const account = db.prepare('SELECT * FROM metric_accounts WHERE id = ?').get(id) as any;
   if (!account) {
@@ -235,7 +236,7 @@ router.get('/:id/stats', async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: `Stats failed: ${err.message}` });
   }
-});
+}));
 
 function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

@@ -8,7 +8,9 @@
 
 ## 1. Overview
 
-Rippl3FX is a self-hosted, single-user dashboard that tracks how a single launch event — a post, a release, a publish — creates ripples across platforms. One drop in Reddit creates waves in GitHub traffic, GA4 sessions, and Bing impressions. Rippl3FX measures the spread.
+Rippl3FX is a self-hosted, single-user dashboard that tracks how a single launch event — a post, a release, a publish — creates ripples across platforms. One blog post creates waves in GitHub traffic, GA4 sessions, and Bing impressions. Rippl3FX measures the spread.
+
+> **Note:** Reddit was removed as a polled platform. Use Events to mark Reddit posts instead — the ripple is measured through the other connected platforms.
 
 The core model is three universal lanes — **Reach, Interest, Engagement** — that every platform maps to. These lanes are shown consistently at every level of the hierarchy: individual tracked item, platform account, tagged group, and the top-level All Metrics view.
 
@@ -454,7 +456,7 @@ volumes:
 
 ## 14. Navigation Structure
 
-- Top nav: All Metrics | Reddit | GitHub | GA4 | Bing | Settings
+- Top nav: All Metrics | Events | GitHub | GA4 | Bing | Settings
 - **All Metrics:** tag filter, three lanes rolled up across all platforms, performance score, layered interest chart
 - **Platform pages:** account-level stats, three lanes for that platform, discovery panel (Get Info + Tag & Track), tracked items list
 - **Settings:** Profile (username, week start day) / Password / TOTP / Metric Accounts / Performance Weights (adjustable with live preview)

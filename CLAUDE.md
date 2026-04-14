@@ -2,9 +2,11 @@
 
 ## Project Overview
 
-Rippl3FX is a self-hosted, single-user dashboard that tracks how a launch event creates ripples across platforms. One Reddit post, one GitHub release, one blog publish — Rippl3FX measures the spread across Reddit, GitHub, GA4, and Bing using three universal lanes: **Reach, Interest, Engagement**.
+Rippl3FX is a self-hosted, single-user dashboard that tracks how a launch event creates ripples across platforms. One GitHub release, one blog publish, one product launch — Rippl3FX measures the spread across GitHub, GA4, and Bing using three universal lanes: **Reach, Interest, Engagement**.
 
 No public API. No multi-tenancy. No webhook ingestion. Connect your accounts, tag what matters, watch the ripple.
+
+> **Note:** Reddit was removed as a polled platform. Use Events to mark Reddit posts — the ripple is measured through the other connected platforms.
 
 ---
 
@@ -385,8 +387,7 @@ issue-23-dashboard-page
 - Week start day is user-configurable (Settings → Profile) — use `getWeekStart()` from `utils/week.ts`, never hardcode Monday
 - GitHub cumulative metrics (stars, watchers, forks) use delta tracking via `metric_previous` table — historical days show 0 (expected)
 - GitHub Traffic API retains 14 days — daily polling is mandatory, not optional
-- Reddit vote counts are approximate — always label as approx in UI
 - Bing avg_rank is inverted — flip sign for velocity calculations
-- Performance weights use sliders in Settings — must sum to exactly 100%, validated on write
+- Performance Score is hidden in the UI (v0.2.0 will replace with Ripple Index)
 - Display normalization is for charting only — never store normalized values
 - `avg_rank` improvement = lower number = positive velocity = flip the sign

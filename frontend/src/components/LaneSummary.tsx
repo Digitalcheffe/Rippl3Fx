@@ -13,7 +13,6 @@ function fmt(n: number): string {
 
 function velColor(v: number): string { return v > 0 ? C.up : v < 0 ? C.down : C.flat; }
 function velSign(v: number): string { return v > 0 ? '+' : ''; }
-function velArrow(v: number): string { return v > 0 ? '↑' : v < 0 ? '↓' : '—'; }
 
 interface LaneData {
   current: number;
@@ -36,7 +35,7 @@ interface Props {
   peaks?: { reach_peak: number; interest_peak: number; engagement_peak: number } | null;
 }
 
-export default function LaneSummary({ items, performanceScore, performanceVelocity, weights, activeCard, onCardClick, timeLabel = 'today', platform, peaks }: Props) {
+export default function LaneSummary({ items, activeCard, onCardClick, timeLabel = 'today', platform, peaks }: Props) {
   const totals: Record<string, LaneData> = {};
   for (const lane of LANES) {
     totals[lane] = {
@@ -44,8 +43,6 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
       velocity: items.reduce((s, i) => s + (i.lanes[lane]?.velocity || 0), 0),
     };
   }
-
-  const pv = performanceVelocity ?? 0;
 
   return (
     <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -98,33 +95,7 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
         );
       })}
 
-      {performanceScore != null && (() => {
-        const isActive = activeCard === 'Performance';
-        return (
-        <div onClick={() => onCardClick?.('Performance')} style={{
-          flex: 1, minWidth: 140,
-          background: isActive ? C.accent + '08' : C.bgCard,
-          borderLeft: `1px solid ${isActive ? C.accent + '60' : C.accent + '30'}`,
-          borderRight: `1px solid ${isActive ? C.accent + '60' : C.accent + '30'}`,
-          borderBottom: `1px solid ${isActive ? C.accent + '60' : C.accent + '30'}`,
-          borderTop: `3px solid ${C.accent}`, borderRadius: 10,
-          padding: '12px 16px', boxShadow: isActive ? `0 4px 16px ${C.accent}20` : '0 2px 8px rgba(30,58,95,0.06)',
-          cursor: onCardClick ? 'pointer' : 'default',
-          transition: 'all 0.2s ease',
-        }}>
-          <div style={{ fontSize: 10, letterSpacing: 2, color: C.accent, textTransform: 'uppercase', fontFamily: font, marginBottom: 4 }}>Performance<LaneTooltip lane="Performance" platform={platform} /></div>
-          <div style={{ fontSize: 24, fontWeight: 900, color: C.text, fontFamily: font, letterSpacing: -0.5, lineHeight: 1 }}>{performanceScore.toFixed(1)}%</div>
-          <div style={{ fontSize: 11, color: velColor(pv), fontWeight: 700, fontFamily: font, marginTop: 4 }}>
-            {pv !== 0 ? `${velArrow(pv)} ${velSign(pv)}${Math.abs(pv).toFixed(1)} ${timeLabel}` : 'No change yet'}
-          </div>
-          {weights && (
-            <div style={{ fontSize: 10, color: C.textFaint, fontFamily: font, marginTop: 4 }}>
-              R {Math.round(weights.reach * 100)}% · I {Math.round(weights.interest * 100)}% · E {Math.round(weights.engagement * 100)}%
-            </div>
-          )}
-        </div>
-        );
-      })()}
+      {/* Performance Score removed — v0.2.0 will replace with Ripple Index */}
     </div>
   );
 }

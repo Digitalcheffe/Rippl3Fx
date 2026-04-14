@@ -12,11 +12,12 @@ import {
   getEventsInDateRange,
 } from '../db/queries/events';
 import { getTagById } from '../db/queries/tags';
+import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
 
 // GET /api/events — list all events, optional ?tag_id= and ?start=/&end= filters
-router.get('/', (req: Request, res: Response) => {
+router.get('/', asyncHandler((req: Request, res: Response) => {
   const { tag_id, start, end } = req.query;
 
   if (tag_id) {
@@ -35,10 +36,10 @@ router.get('/', (req: Request, res: Response) => {
   }
 
   res.json(getAllEvents());
-});
+}));
 
 // GET /api/events/:id — single event with its tags
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', asyncHandler((req: Request, res: Response) => {
   const event = getEventById(Number(req.params.id));
   if (!event) {
     res.status(404).json({ error: 'Event not found' });
@@ -46,10 +47,10 @@ router.get('/:id', (req: Request, res: Response) => {
   }
   const tags = getTagsForEvent(event.id);
   res.json({ ...event, tags });
-});
+}));
 
 // POST /api/events — create event, optional tag_ids array
-router.post('/', (req: Request, res: Response) => {
+router.post('/', asyncHandler((req: Request, res: Response) => {
   const { name, event_date, description, event_url, tag_ids } = req.body;
 
   if (!name || typeof name !== 'string' || !name.trim()) {
@@ -75,10 +76,10 @@ router.post('/', (req: Request, res: Response) => {
 
   const tags = getTagsForEvent(event.id);
   res.status(201).json({ ...event, tags });
-});
+}));
 
 // PUT /api/events/:id — update event fields
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', asyncHandler((req: Request, res: Response) => {
   const id = Number(req.params.id);
   const { name, description, event_date, event_url } = req.body;
 
@@ -90,20 +91,20 @@ router.put('/:id', (req: Request, res: Response) => {
 
   const tags = getTagsForEvent(updated.id);
   res.json({ ...updated, tags });
-});
+}));
 
 // DELETE /api/events/:id
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', asyncHandler((req: Request, res: Response) => {
   const deleted = deleteEvent(Number(req.params.id));
   if (!deleted) {
     res.status(404).json({ error: 'Event not found' });
     return;
   }
   res.json({ success: true });
-});
+}));
 
 // POST /api/events/:id/tags — assign tag
-router.post('/:id/tags', (req: Request, res: Response) => {
+router.post('/:id/tags', asyncHandler((req: Request, res: Response) => {
   const eventId = Number(req.params.id);
   const { tag_id } = req.body;
 
@@ -131,10 +132,10 @@ router.post('/:id/tags', (req: Request, res: Response) => {
   }
 
   res.status(201).json({ success: true });
-});
+}));
 
 // DELETE /api/events/:id/tags/:tagId — remove tag
-router.delete('/:id/tags/:tagId', (req: Request, res: Response) => {
+router.delete('/:id/tags/:tagId', asyncHandler((req: Request, res: Response) => {
   const eventId = Number(req.params.id);
   const tagId = Number(req.params.tagId);
 
@@ -145,6 +146,6 @@ router.delete('/:id/tags/:tagId', (req: Request, res: Response) => {
   }
 
   res.json({ success: true });
-});
+}));
 
 export default router;

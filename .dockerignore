@@ -1,5 +1,7 @@
 node_modules/
+**/node_modules/
 dist/
+**/dist/
 .git
 .env
 data/
@@ -7,3 +9,4 @@ data/
 .DS_Store
 *.tsbuildinfo
 .claude/
+docs/
