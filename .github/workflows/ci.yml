@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install dependencies
-        run: cd frontend && npm ci --legacy-peer-deps
+        run: cd frontend && npm ci
       - name: Build
         run: cd frontend && npm run build
 
