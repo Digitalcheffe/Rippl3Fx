@@ -9,28 +9,29 @@ import { collectBing } from '../platforms/bing';
 import { collectAccountStats } from '../platforms/account-stats';
 import { insertPollLog } from '../db/queries/logs';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
+import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
 
 const VALID_PLATFORMS = ['github', 'ga4', 'bing'];
 
 // GET /api/accounts
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', asyncHandler((_req: Request, res: Response) => {
   res.json(getAllAccounts());
-});
+}));
 
 // GET /api/accounts/:id
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', asyncHandler((req: Request, res: Response) => {
   const account = getAccountById(Number(req.params.id));
   if (!account) {
     res.status(404).json({ error: 'Account not found' });
     return;
   }
   res.json(account);
-});
+}));
 
 // POST /api/accounts
-router.post('/', (req: Request, res: Response) => {
+router.post('/', asyncHandler((req: Request, res: Response) => {
   const { platform, display_name, credentials, polling_interval_min } = req.body;
 
   if (!platform || !VALID_PLATFORMS.includes(platform)) {
@@ -63,10 +64,10 @@ router.post('/', (req: Request, res: Response) => {
       console.error(`[Account] Auto-backfill failed for new account ${account.id}: ${err.message}`)
     );
   });
-});
+}));
 
 // PUT /api/accounts/:id
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', asyncHandler((req: Request, res: Response) => {
   const id = Number(req.params.id);
   const existing = getAccountById(id);
   if (!existing) {
@@ -107,10 +108,10 @@ router.put('/:id', (req: Request, res: Response) => {
 
   const account = updateAccount(id, updates);
   res.json(account);
-});
+}));
 
 // POST /api/accounts/:id/deactivate — soft-delete: stop polling, untrack all items
-router.post('/:id/deactivate', (req: Request, res: Response) => {
+router.post('/:id/deactivate', asyncHandler((req: Request, res: Response) => {
   const id = Number(req.params.id);
   const account = getAccountById(id);
   if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
@@ -125,20 +126,20 @@ router.post('/:id/deactivate', (req: Request, res: Response) => {
   }
 
   res.json({ success: true, message: `Account deactivated. ${items.length} items untracked. Metrics preserved.` });
-});
+}));
 
 // POST /api/accounts/:id/reactivate — re-enable account
-router.post('/:id/reactivate', (req: Request, res: Response) => {
+router.post('/:id/reactivate', asyncHandler((req: Request, res: Response) => {
   const id = Number(req.params.id);
   const account = getAccountById(id);
   if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
 
   updateAccount(id, { is_active: 1 });
   res.json({ success: true, message: 'Account reactivated. Re-track items individually.' });
-});
+}));
 
 // DELETE /api/accounts/:id — permanent delete: purges account + items + metrics
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', asyncHandler((req: Request, res: Response) => {
   const id = Number(req.params.id);
   const account = getAccountById(id);
   if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
@@ -197,10 +198,10 @@ router.delete('/:id', (req: Request, res: Response) => {
   dbConn.prepare('DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM item_tags)').run();
 
   res.json({ success: true, message: `Account permanently deleted. ${idList.length} items purged.` });
-});
+}));
 
 // POST /api/accounts/:id/poll-now — trigger immediate poll
-router.post('/:id/poll-now', async (req: Request, res: Response) => {
+router.post('/:id/poll-now', asyncHandler(async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const account = getAccountById(id);
   if (!account) {
@@ -267,6 +268,6 @@ router.post('/:id/poll-now', async (req: Request, res: Response) => {
   }
 
   res.json({ success: allSuccess, results });
-});
+}));
 
 export default router;

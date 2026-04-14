@@ -6,19 +6,29 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: Production
+# Stage 2: Build backend
+FROM node:20-alpine AS backend-builder
+WORKDIR /app
+COPY backend/package.json backend/package-lock.json ./
+RUN npm ci
+COPY backend/ ./
+RUN npx tsc
+
+# Stage 3: Production
 FROM node:20-alpine
 WORKDIR /app
 
-# Copy backend and install production deps
+# Copy backend package files and install production deps only (native modules built for Alpine)
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --production
-COPY backend/ ./
 
-# Build backend TypeScript
-RUN npm install -g typescript && tsc && npm uninstall -g typescript
+# Copy compiled backend JS
+COPY --from=backend-builder /app/dist ./dist
 
-# Copy frontend build output into dist/ (where Express serves it)
+# Copy backend source (needed for migrations SQL files at runtime)
+COPY backend/src/db/migrations ./src/db/migrations
+
+# Copy frontend build output into dist/ (coexists with backend JS — index.html + assets/)
 COPY --from=frontend-builder /app/frontend/dist ./dist
 
 # Create data directory for SQLite

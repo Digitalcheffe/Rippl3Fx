@@ -7,7 +7,6 @@ import EmptyState from '../components/EmptyState';
 import DiscoveryPanel from '../components/DiscoveryPanel';
 import AccountStats from '../components/AccountStats';
 import LaneSummary from '../components/LaneSummary';
-import PerformanceTrend from '../components/PerformanceTrend';
 import LayeredInterestChart, { type ChartEvent } from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
 import { LaneInfoButton, LaneInfoPanel } from '../components/LaneInfo';
@@ -82,6 +81,7 @@ export default function Platform() {
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<TrackedItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dashboardItems, setDashboardItems] = useState<any[]>([]);
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [activeChart, setActiveChart] = useState<string | null>(null);
@@ -101,7 +101,7 @@ export default function Platform() {
       if (filtered.length > 0) setActiveAccountId(filtered[0].id);
       else setActiveAccountId(null);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => { setError('Failed to load accounts'); setLoading(false); });
   }, [platform]);
 
   // Load items when active account changes
@@ -217,7 +217,9 @@ export default function Platform() {
   // Tag removal handled via tag management UI
   void itemTags; // used in StatCard rendering
 
-  if (loading) return null;
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: 40, color: C.textSoft, fontFamily: font, fontSize: 13 }}>Loading...</div>
+  );
 
   return (
     <div>
@@ -240,6 +242,12 @@ export default function Platform() {
       </div>
 
       <hr style={{ border: 'none', borderTop: `3px solid ${C.borderMid}`, margin: '10px 0' }} />
+
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#991b1b', fontFamily: font }}>
+          {error}
+        </div>
+      )}
 
       {/* Row 2: Tag selector + Poll Now + Info */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>

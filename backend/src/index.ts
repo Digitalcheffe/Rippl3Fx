@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import path from 'path';
@@ -49,6 +49,14 @@ app.use('/api/logs', logsRouter);
 app.use('/api/accounts', discoverRouter);
 app.use('/api/performance', performanceRouter);
 app.use('/api/events', eventsRouter);
+
+// Global error handler — must be after all routes, before SPA fallback
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[API Error]', err.message || err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Serve frontend static files
 const distPath = path.join(__dirname, '..', 'dist');

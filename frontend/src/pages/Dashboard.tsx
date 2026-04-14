@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { C } from '../theme';
 import { apiGet } from '../api/client';
 import LaneSummary from '../components/LaneSummary';
-import PerformanceTrend from '../components/PerformanceTrend';
 import LayeredInterestChart, { type ChartEvent } from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
 import SkeletonCard from '../components/SkeletonCard';
@@ -87,6 +86,7 @@ export default function Dashboard() {
   const [activeTag, setActiveTag] = useState('All');
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeChart, setActiveChart] = useState<string | null>(null);
   const [events, setEvents] = useState<ChartEvent[]>([]);
 
@@ -97,7 +97,7 @@ export default function Dashboard() {
       params.set('range', timeRange);
       const resp = await apiGet<DashboardResponse>(`/dashboard?${params}`);
       setData(resp);
-    } catch { /* ignore */ }
+    } catch (err) { setError('Failed to load dashboard data'); }
     setLoading(false);
   }, [activeTag, timeRange]);
 
@@ -191,6 +191,12 @@ export default function Dashboard() {
           {tags.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
         </select>
       </div>
+
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#991b1b', fontFamily: font }}>
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>

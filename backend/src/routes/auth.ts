@@ -6,17 +6,18 @@ import { generateSecret, generateQRCode, verifyCode } from '../auth/totp';
 import { AuthRequest, requireAuth } from '../middleware/auth';
 import { clearWeekStartCache } from '../utils/week';
 import { rerollWeeklyData } from '../rollup/weekly';
+import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
 
 // GET /api/auth/status — first-run detection
-router.get('/status', (_req: Request, res: Response) => {
+router.get('/status', asyncHandler((_req: Request, res: Response) => {
   const user = db.prepare('SELECT id FROM user LIMIT 1').get();
   res.json({ configured: !!user });
-});
+}));
 
 // POST /api/auth/setup — create first user
-router.post('/setup', async (req: Request, res: Response) => {
+router.post('/setup', asyncHandler(async (req: Request, res: Response) => {
   const existing = db.prepare('SELECT id FROM user LIMIT 1').get();
   if (existing) {
     res.status(400).json({ error: 'User already configured' });
@@ -43,10 +44,10 @@ router.post('/setup', async (req: Request, res: Response) => {
   });
 
   res.json({ success: true });
-});
+}));
 
 // POST /api/auth/login — authenticate user
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', asyncHandler(async (req: Request, res: Response) => {
   const { username, password, totpCode } = req.body;
   if (!username || !password) {
     res.status(400).json({ error: 'Username and password required' });
@@ -88,16 +89,16 @@ router.post('/login', async (req: Request, res: Response) => {
   });
 
   res.json({ success: true });
-});
+}));
 
 // POST /api/auth/logout
-router.post('/logout', (_req: Request, res: Response) => {
+router.post('/logout', asyncHandler((_req: Request, res: Response) => {
   res.clearCookie('token');
   res.json({ success: true });
-});
+}));
 
 // GET /api/auth/me — get current user (protected)
-router.get('/me', requireAuth, (req: AuthRequest, res: Response) => {
+router.get('/me', requireAuth, asyncHandler((req: AuthRequest, res: Response) => {
   if (!req.user) {
     res.status(401).json({ error: 'Not authenticated' });
     return;
@@ -110,10 +111,10 @@ router.get('/me', requireAuth, (req: AuthRequest, res: Response) => {
     return;
   }
   res.json(user);
-});
+}));
 
 // PUT /api/auth/week-start — update week start day preference (protected)
-router.put('/week-start', requireAuth, (req: AuthRequest, res: Response) => {
+router.put('/week-start', requireAuth, asyncHandler((req: AuthRequest, res: Response) => {
   if (!req.user) {
     res.status(401).json({ error: 'Not authenticated' });
     return;
@@ -130,10 +131,10 @@ router.put('/week-start', requireAuth, (req: AuthRequest, res: Response) => {
   try { rerollWeeklyData(weekStartDay); } catch (err: any) {
     console.error(`[Auth] Weekly re-rollup failed: ${err.message}`);
   }
-});
+}));
 
 // POST /api/auth/totp/setup — generate TOTP secret + QR (protected)
-router.post('/totp/setup', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/totp/setup', requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     res.status(401).json({ error: 'Not authenticated' });
     return;
@@ -153,10 +154,10 @@ router.post('/totp/setup', requireAuth, async (req: AuthRequest, res: Response) 
 
   const qrCode = await generateQRCode(secret.base32, user.username);
   res.json({ secret: secret.base32, qrCode });
-});
+}));
 
 // POST /api/auth/totp/verify — verify TOTP code and enable (protected)
-router.post('/totp/verify', requireAuth, (req: AuthRequest, res: Response) => {
+router.post('/totp/verify', requireAuth, asyncHandler((req: AuthRequest, res: Response) => {
   if (!req.user) {
     res.status(401).json({ error: 'Not authenticated' });
     return;
@@ -183,10 +184,10 @@ router.post('/totp/verify', requireAuth, (req: AuthRequest, res: Response) => {
 
   db.prepare('UPDATE user SET totp_enabled = 1 WHERE id = ?').run(req.user.userId);
   res.json({ success: true, totpEnabled: true });
-});
+}));
 
 // POST /api/auth/totp/disable — disable TOTP (protected)
-router.post('/totp/disable', requireAuth, (req: AuthRequest, res: Response) => {
+router.post('/totp/disable', requireAuth, asyncHandler((req: AuthRequest, res: Response) => {
   if (!req.user) {
     res.status(401).json({ error: 'Not authenticated' });
     return;
@@ -194,10 +195,10 @@ router.post('/totp/disable', requireAuth, (req: AuthRequest, res: Response) => {
 
   db.prepare('UPDATE user SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(req.user.userId);
   res.json({ success: true, totpEnabled: false });
-});
+}));
 
 // POST /api/auth/change-password (protected)
-router.post('/change-password', requireAuth, async (req: AuthRequest, res: Response) => {
+router.post('/change-password', requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     res.status(401).json({ error: 'Not authenticated' });
     return;
@@ -226,6 +227,6 @@ router.post('/change-password', requireAuth, async (req: AuthRequest, res: Respo
   const newHash = await hashPassword(newPassword);
   db.prepare('UPDATE user SET password_hash = ? WHERE id = ?').run(newHash, req.user.userId);
   res.json({ success: true });
-});
+}));
 
 export default router;

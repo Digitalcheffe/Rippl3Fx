@@ -304,15 +304,12 @@ function AllLanesChartSVG({ items, width, height, range = 'daily', events = [] }
       })}
 
       {/* Lane areas + lines */}
-      {ALL_LANES.map((lane, laneIdx) => {
+      {ALL_LANES.map((lane) => {
         const data = laneData[lane];
         const color = LANE_COLORS[lane] || C.accent;
         const pts = data.map((v, i) => [toX(i), toY(v)]);
         const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
         const area = `${line} L${toX(maxIdx)},${padT + cH} L${toX(0)},${padT + cH} Z`;
-        // Stagger labels above the line per lane to avoid overlap
-        const labelYOffset = laneIdx === 0 ? -20 : laneIdx === 1 ? -14 : -8;
-
         return (
           <g key={lane}>
             <path d={area} fill={color} opacity={0.1} />

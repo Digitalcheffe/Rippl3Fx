@@ -1,36 +1,37 @@
 import { Router, Request, Response } from 'express';
 import { getAllTags, getTagById, getTagByName, createTag, deleteTag, getTagsForItem, assignTagToItem, removeTagFromItem, getItemsForTag } from '../db/queries/tags';
 import { getItemById } from '../db/queries/items';
+import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
 
 // GET /api/tags
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', asyncHandler((_req: Request, res: Response) => {
   res.json(getAllTags());
-});
+}));
 
 // GET /api/tags/:id
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', asyncHandler((req: Request, res: Response) => {
   const tag = getTagById(Number(req.params.id));
   if (!tag) {
     res.status(404).json({ error: 'Tag not found' });
     return;
   }
   res.json(tag);
-});
+}));
 
 // GET /api/tags/:id/items
-router.get('/:id/items', (req: Request, res: Response) => {
+router.get('/:id/items', asyncHandler((req: Request, res: Response) => {
   const tag = getTagById(Number(req.params.id));
   if (!tag) {
     res.status(404).json({ error: 'Tag not found' });
     return;
   }
   res.json(getItemsForTag(tag.id));
-});
+}));
 
 // POST /api/tags
-router.post('/', (req: Request, res: Response) => {
+router.post('/', asyncHandler((req: Request, res: Response) => {
   const { name } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     res.status(400).json({ error: 'name is required and must be a non-empty string' });
@@ -45,10 +46,10 @@ router.post('/', (req: Request, res: Response) => {
 
   const tag = createTag(name.trim());
   res.status(201).json(tag);
-});
+}));
 
 // GET /api/tags/:id/usage — check how many items use this tag
-router.get('/:id/usage', (req: Request, res: Response) => {
+router.get('/:id/usage', asyncHandler((req: Request, res: Response) => {
   const tag = getTagById(Number(req.params.id));
   if (!tag) {
     res.status(404).json({ error: 'Tag not found' });
@@ -56,30 +57,30 @@ router.get('/:id/usage', (req: Request, res: Response) => {
   }
   const items = getItemsForTag(tag.id);
   res.json({ tag, itemCount: items.length, items: items.map((i: any) => ({ id: i.id, display_name: i.display_name })) });
-});
+}));
 
 // DELETE /api/tags/:id
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', asyncHandler((req: Request, res: Response) => {
   const deleted = deleteTag(Number(req.params.id));
   if (!deleted) {
     res.status(404).json({ error: 'Tag not found' });
     return;
   }
   res.json({ success: true });
-});
+}));
 
 // GET /api/items/:id/tags
-router.get('/items/:id/tags', (req: Request, res: Response) => {
+router.get('/items/:id/tags', asyncHandler((req: Request, res: Response) => {
   const item = getItemById(Number(req.params.id));
   if (!item) {
     res.status(404).json({ error: 'Item not found' });
     return;
   }
   res.json(getTagsForItem(item.id));
-});
+}));
 
 // POST /api/items/:id/tags — assign tag to item
-router.post('/items/:id/tags', (req: Request, res: Response) => {
+router.post('/items/:id/tags', asyncHandler((req: Request, res: Response) => {
   const itemId = Number(req.params.id);
   const { tag_id } = req.body;
 
@@ -107,10 +108,10 @@ router.post('/items/:id/tags', (req: Request, res: Response) => {
   }
 
   res.status(201).json({ success: true });
-});
+}));
 
 // DELETE /api/items/:id/tags/:tagId — remove tag from item
-router.delete('/items/:id/tags/:tagId', (req: Request, res: Response) => {
+router.delete('/items/:id/tags/:tagId', asyncHandler((req: Request, res: Response) => {
   const itemId = Number(req.params.id);
   const tagId = Number(req.params.tagId);
 
@@ -121,6 +122,6 @@ router.delete('/items/:id/tags/:tagId', (req: Request, res: Response) => {
   }
 
   res.json({ success: true });
-});
+}));
 
 export default router;

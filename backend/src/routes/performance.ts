@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import db from '../db/connection';
+import { asyncHandler } from '../middleware/asyncHandler';
 
 const router = Router();
 
@@ -12,7 +13,7 @@ interface PerformanceWeights {
 }
 
 // GET /api/performance/weights
-router.get('/weights', (_req: Request, res: Response) => {
+router.get('/weights', asyncHandler((_req: Request, res: Response) => {
   const row = db.prepare('SELECT * FROM performance_weights LIMIT 1').get() as PerformanceWeights | undefined;
   if (!row) {
     res.json({ reach_weight: 0.20, interest_weight: 0.30, engagement_weight: 0.50 });
@@ -23,10 +24,10 @@ router.get('/weights', (_req: Request, res: Response) => {
     interest_weight: row.interest_weight,
     engagement_weight: row.engagement_weight,
   });
-});
+}));
 
 // PUT /api/performance/weights
-router.put('/weights', (req: Request, res: Response) => {
+router.put('/weights', asyncHandler((req: Request, res: Response) => {
   const { reach_weight, interest_weight, engagement_weight } = req.body;
 
   if (typeof reach_weight !== 'number' || typeof interest_weight !== 'number' || typeof engagement_weight !== 'number') {
@@ -52,7 +53,7 @@ router.put('/weights', (req: Request, res: Response) => {
   }
 
   res.json({ reach_weight, interest_weight, engagement_weight });
-});
+}));
 
 export function getPerformanceWeights(): { reach: number; interest: number; engagement: number } {
   const row = db.prepare('SELECT reach_weight, interest_weight, engagement_weight FROM performance_weights LIMIT 1').get() as any;
