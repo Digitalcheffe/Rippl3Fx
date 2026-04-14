@@ -85,16 +85,6 @@ volumes:
   - ./my-data:/data
 ```
 
-### Building from Source
-
-If you prefer to build the image yourself:
-
-```bash
-git clone https://github.com/Digitalcheffe/Rippl3Fx.git
-cd Rippl3Fx
-docker compose up --build
-```
-
 ## Development
 
 ```bash
