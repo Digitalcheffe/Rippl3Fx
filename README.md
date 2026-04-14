@@ -4,7 +4,32 @@ Self-hosted dashboard that tracks how a launch event creates ripples across plat
 
 Mark events (launches, posts, releases) and watch the ripple spread across your connected platforms.
 
-## Quick Start
+> Built with [Claude Code](https://claude.com/claude-code) — the AI-powered coding agent by Anthropic. Architecture, implementation, and documentation were developed collaboratively between a human product owner and Claude Code.
+
+## Features
+
+- **Three-lane model** — Reach, Interest, Engagement across all platforms
+- **Events** — mark launches and releases, see vertical markers on charts
+- **Platform polling** — automated data collection with configurable intervals
+- **Hourly, daily, weekly, monthly** time ranges with velocity tracking
+- **Docker deployment** — single image, SQLite database, zero external dependencies
+- **Zero config** — secrets auto-generated on first run, no `.env` required
+
+## Platform Setup
+
+See [docs/account-setup.md](docs/account-setup.md) for step-by-step instructions to connect:
+
+- **GitHub** — Personal Access Token (classic) with `repo` scope
+- **GA4** — Google Cloud service account with Analytics Viewer role
+- **Bing** — Webmaster Tools API key
+
+## Configuration
+
+### Week Start Day
+
+By default, weekly metrics use Monday as the first day of the week. Change this in **Settings → Profile → Week Starts On** to any day (Sunday through Saturday). All weekly rollups, chart boundaries, and date labels will align to your preference.
+
+## Quick Start — Docker
 
 ```bash
 git clone https://github.com/Digitalcheffe/Rippl3Fx.git
@@ -16,16 +41,7 @@ That's it. Open `http://localhost:3000` and create your account on first run.
 
 The database, encryption keys, and JWT secrets are automatically generated and stored in the Docker volume. Everything persists across restarts.
 
-## Features
-
-- **Three-lane model** — Reach, Interest, Engagement across all platforms
-- **Events** — mark launches and releases, see vertical markers on charts
-- **Platform polling** — automated data collection with configurable intervals
-- **Hourly, daily, weekly, monthly** time ranges with velocity tracking
-- **Docker deployment** — single image, SQLite database, zero external dependencies
-- **Zero config** — secrets auto-generated on first run, no `.env` required
-
-## Data Persistence
+### Data Persistence
 
 All data lives in `/data` inside the container:
 
@@ -41,17 +57,7 @@ volumes:
   - ./my-data:/data
 ```
 
-## Platform Setup
-
-See [docs/account-setup.md](docs/account-setup.md) for step-by-step instructions to connect GitHub, GA4, and Bing.
-
-## Configuration
-
-### Week Start Day
-
-By default, weekly metrics use Monday as the first day of the week. Change this in **Settings → Profile → Week Starts On** to any day (Sunday through Saturday). All weekly rollups, chart boundaries, and date labels will align to your preference.
-
-## Environment Variables
+### Environment Variables
 
 All environment variables are **optional**. The app works out of the box with no configuration.
 
@@ -64,9 +70,11 @@ All environment variables are **optional**. The app works out of the box with no
 
 If `ENCRYPTION_KEY` or `JWT_SECRET` are not set, the app generates random secrets on first startup and stores them in `/data/config.json`. They persist across restarts via the volume. Setting env vars overrides the stored values.
 
-## Development
+## Build Manually
 
 ```bash
-cd backend && npm run dev    # Backend on :3000
-cd frontend && npm run dev   # Frontend on :5173
+cd backend && npm install && npm run dev    # Backend on :3000
+cd frontend && npm install && npm run dev   # Frontend on :5173
 ```
+
+When running outside Docker, data is stored in `backend/data/` by default. Set `DATA_DIR` to change the location.
