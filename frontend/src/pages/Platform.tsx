@@ -8,7 +8,7 @@ import DiscoveryPanel from '../components/DiscoveryPanel';
 import AccountStats from '../components/AccountStats';
 import LaneSummary from '../components/LaneSummary';
 import PerformanceTrend from '../components/PerformanceTrend';
-import LayeredInterestChart from '../components/LayeredInterestChart';
+import LayeredInterestChart, { type ChartEvent } from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
 import { LaneInfoButton, LaneInfoPanel } from '../components/LaneInfo';
 
@@ -88,6 +88,9 @@ export default function Platform() {
   const [showInfo, setShowInfo] = useState(false);
   const [activeTag, setActiveTag] = useState('All');
   const [showDiscovery, setShowDiscovery] = useState(false);
+  const [events, setEvents] = useState<ChartEvent[]>([]);
+
+  useEffect(() => { apiGet<ChartEvent[]>('/events').then(setEvents).catch(() => {}); }, []);
 
   // Load accounts for this platform
   useEffect(() => {
@@ -358,7 +361,7 @@ export default function Platform() {
                 />
                 {chartItems.length > 0 && (
                   <div style={{ marginTop: 12, marginBottom: 16 }}>
-                    <LayeredInterestChart items={chartItems} lane={activeChart || 'all'} range={timeRange} />
+                    <LayeredInterestChart items={chartItems} lane={activeChart || 'all'} range={timeRange} events={events} />
                   </div>
                 )}
               </>

@@ -4,7 +4,7 @@ import { C } from '../theme';
 import { apiGet } from '../api/client';
 import LaneSummary from '../components/LaneSummary';
 import PerformanceTrend from '../components/PerformanceTrend';
-import LayeredInterestChart from '../components/LayeredInterestChart';
+import LayeredInterestChart, { type ChartEvent } from '../components/LayeredInterestChart';
 import StatCard, { type StatCardItem } from '../components/StatCard';
 import SkeletonCard from '../components/SkeletonCard';
 
@@ -88,6 +88,7 @@ export default function Dashboard() {
   const [timeRange, setTimeRange] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [loading, setLoading] = useState(true);
   const [activeChart, setActiveChart] = useState<string | null>(null);
+  const [events, setEvents] = useState<ChartEvent[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -101,6 +102,7 @@ export default function Dashboard() {
   }, [activeTag, timeRange]);
 
   useEffect(() => { apiGet<Tag[]>('/tags').then(setTags).catch(() => {}); }, []);
+  useEffect(() => { apiGet<ChartEvent[]>('/events').then(setEvents).catch(() => {}); }, []);
   useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
   useEffect(() => { const i = setInterval(fetchData, 5 * 60 * 1000); return () => clearInterval(i); }, [fetchData]);
 
@@ -227,6 +229,7 @@ export default function Dashboard() {
                   lane={activeChart || 'all'}
                   tag={activeTag !== 'All' ? activeTag : undefined}
                   range={timeRange}
+                  events={events}
                 />
               </div>
             ) : null;
