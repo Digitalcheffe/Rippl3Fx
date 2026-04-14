@@ -31,15 +31,40 @@ By default, weekly metrics use Monday as the first day of the week. Change this 
 
 ## Quick Start — Docker
 
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  rippl3fx:
+    image: ghcr.io/digitalcheffe/rippl3fx:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - rippl3fx-data:/data
+    environment:
+      - TZ=America/New_York    # Optional: set your timezone
+
+volumes:
+  rippl3fx-data:
+```
+
+```bash
+docker compose up -d
+```
+
+That's it. Open `http://localhost:3000` and create your account on first run.
+
+The database, encryption keys, and JWT secrets are automatically generated and stored in the volume. Everything persists across restarts.
+
+### Building from Source
+
+If you prefer to build the image yourself:
+
 ```bash
 git clone https://github.com/Digitalcheffe/Rippl3Fx.git
 cd Rippl3Fx
 docker compose up --build
 ```
-
-That's it. Open `http://localhost:3000` and create your account on first run.
-
-The database, encryption keys, and JWT secrets are automatically generated and stored in the Docker volume. Everything persists across restarts.
 
 ### Data Persistence
 
@@ -50,7 +75,7 @@ All data lives in `/data` inside the container:
 | `/data/rippl3fx.db` | SQLite database (accounts, metrics, events) |
 | `/data/config.json` | Auto-generated encryption key and JWT secret |
 
-The default `docker-compose.yml` mounts a named volume to `/data`. To use a local directory instead:
+The `docker-compose.yml` above mounts a named volume to `/data`. To use a local directory instead:
 
 ```yaml
 volumes:
@@ -66,11 +91,11 @@ All environment variables are **optional**. The app works out of the box with no
 | `ENCRYPTION_KEY` | Auto-generated | Override the encryption key for platform credentials |
 | `JWT_SECRET` | Auto-generated | Override the JWT signing secret |
 | `PORT` | `3000` | Server port |
-| `TZ` | `UTC` | Timezone for rollups (e.g. `America/New_York`) |
+| `TZ` | `UTC` | Timezone for rollups and date boundaries (e.g. `America/New_York`) |
 
-If `ENCRYPTION_KEY` or `JWT_SECRET` are not set, the app generates random secrets on first startup and stores them in `/data/config.json`. They persist across restarts via the volume. Setting env vars overrides the stored values.
+If `ENCRYPTION_KEY` or `JWT_SECRET` are not set, the app generates random secrets on first startup and stores them in `/data/config.json`. Setting env vars overrides the stored values.
 
-## Build Manually
+## Development
 
 ```bash
 cd backend && npm install && npm run dev    # Backend on :3000
