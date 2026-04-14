@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { migrate } from './db/migrate';
 import { authMiddleware } from './middleware/auth';
@@ -29,13 +30,19 @@ app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 
+// Global rate limit — 100 requests per minute per IP
+app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false }));
+
+// Strict rate limit on auth routes — 10 requests per minute per IP
+const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+
 // Health check (no auth)
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Auth routes (no auth required)
-app.use('/api/auth', authRouter);
+// Auth routes (no auth required, strict rate limit)
+app.use('/api/auth', authLimiter, authRouter);
 
 // JWT middleware for all other /api routes
 app.use(authMiddleware);
