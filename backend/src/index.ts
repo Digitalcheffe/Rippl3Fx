@@ -5,7 +5,7 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import { migrate } from './db/migrate';
 import { authMiddleware } from './middleware/auth';
-import { doubleCsrfProtection, generateCsrfToken } from './middleware/csrf';
+import { generateCsrfToken } from './middleware/csrf';
 import { apiLimiter } from './middleware/rateLimiter';
 import authRouter from './routes/auth';
 import accountsRouter from './routes/accounts';
@@ -30,8 +30,6 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
-app.use('/api', doubleCsrfProtection);
-
 // CSRF token endpoint — frontend calls this to get a token for mutation requests
 app.get('/api/csrf-token', apiLimiter, (req, res) => {
   const token = generateCsrfToken(req, res);

@@ -8,9 +8,11 @@ import { clearWeekStartCache } from '../utils/week';
 import { rerollWeeklyData } from '../rollup/weekly';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { authLimiter } from '../middleware/rateLimiter';
+import { doubleCsrfProtection } from '../middleware/csrf';
 
 const router = Router();
 router.use(authLimiter);
+router.use(doubleCsrfProtection);
 
 // GET /api/auth/status — first-run detection
 router.get('/status', asyncHandler((_req: Request, res: Response) => {

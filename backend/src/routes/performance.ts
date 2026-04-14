@@ -2,9 +2,11 @@ import { Router, Request, Response } from 'express';
 import db from '../db/connection';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { apiLimiter } from '../middleware/rateLimiter';
+import { doubleCsrfProtection } from '../middleware/csrf';
 
 const router = Router();
 router.use(apiLimiter);
+router.use(doubleCsrfProtection);
 
 interface PerformanceWeights {
   id: number;
