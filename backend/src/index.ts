@@ -5,7 +5,7 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import { migrate } from './db/migrate';
 import { authMiddleware } from './middleware/auth';
-import { csrfProtection } from './middleware/csrf';
+import { csrfProtection, generateToken } from './middleware/csrf';
 import { apiLimiter } from './middleware/rateLimiter';
 import authRouter from './routes/auth';
 import accountsRouter from './routes/accounts';
@@ -31,6 +31,12 @@ app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 app.use('/api', csrfProtection);
+
+// CSRF token endpoint — frontend calls this to get a token for mutation requests
+app.get('/api/csrf-token', apiLimiter, (req, res) => {
+  const token = generateToken(req, res);
+  res.json({ token });
+});
 
 // Health check (no auth)
 app.get('/api/health', apiLimiter, (_req, res) => {
