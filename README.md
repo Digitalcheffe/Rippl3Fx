@@ -6,6 +6,8 @@ Mark events (launches, posts, releases) and watch the ripple spread across your 
 
 > Built with [Claude Code](https://claude.com/claude-code) — the AI-powered coding agent by Anthropic. Architecture, implementation, and documentation were developed collaboratively between a human product owner and Claude Code.
 
+![Rippl3FX Dashboard](docs/screenshots/Rippl3Fx_AllMetrics.png)
+
 ## Features
 
 - **Three-lane model** — Reach, Interest, Engagement across all platforms
