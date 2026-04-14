@@ -1,12 +1,12 @@
 import crypto from 'crypto';
+import { getConfig } from '../config';
 
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
 
 function getKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key) throw new Error('ENCRYPTION_KEY environment variable is required');
-  // Ensure 32-byte key by hashing if needed
+  const key = getConfig().encryption_key;
+  // Ensure 32-byte key by hashing
   return crypto.createHash('sha256').update(key).digest();
 }
 

@@ -31,8 +31,9 @@ COPY backend/src/db/migrations ./src/db/migrations
 # Copy frontend build output into dist/ (coexists with backend JS — index.html + assets/)
 COPY --from=frontend-builder /app/frontend/dist ./dist
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
+# Default data directory — mount a volume here to persist
+RUN mkdir -p /data
+ENV DATA_DIR=/data
 
 EXPOSE 3000
 
