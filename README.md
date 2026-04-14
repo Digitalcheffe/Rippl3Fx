@@ -31,6 +31,8 @@ By default, weekly metrics use Monday as the first day of the week. Change this 
 
 ## Quick Start — Docker
 
+The database, encryption keys, and JWT secrets are automatically generated and stored in the volume. Everything persists across restarts — no `.env` file needed.
+
 Create a `docker-compose.yml`:
 
 ```yaml
@@ -53,8 +55,6 @@ docker compose up -d
 ```
 
 That's it. Open `http://localhost:3000` and create your account on first run.
-
-The database, encryption keys, and JWT secrets are automatically generated and stored in the volume. Everything persists across restarts.
 
 ### Environment Variables
 
