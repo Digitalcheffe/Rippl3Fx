@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { getPollLogs } from '../db/queries/logs';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+router.use(apiLimiter);
 
 // GET /api/logs?page=1&limit=100
 router.get('/', asyncHandler((req: Request, res: Response) => {

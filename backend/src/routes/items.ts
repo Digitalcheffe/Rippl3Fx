@@ -4,8 +4,10 @@ import { getItemsByAccount, getItemById, getAllItems, createItem, updateItem, de
 import { getAccountById } from '../db/queries/accounts';
 import { purgeTrackedMetrics } from '../db/queries/tracked';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+router.use(apiLimiter);
 
 // GET /api/items
 router.get('/', asyncHandler((_req: Request, res: Response) => {

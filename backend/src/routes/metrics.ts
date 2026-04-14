@@ -5,8 +5,10 @@ import { getUnifiedPair, getUnifiedHistory, getUnifiedHourlyPair, getUnifiedHour
 import { getPerformanceWeights } from './performance';
 import { getPeaks } from '../lanes/unify';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+router.use(apiLimiter);
 
 // GET /api/dashboard?tag=NORA&range=daily
 router.get('/dashboard', asyncHandler((req: Request, res: Response) => {

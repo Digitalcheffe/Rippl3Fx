@@ -13,8 +13,10 @@ import {
 } from '../db/queries/events';
 import { getTagById } from '../db/queries/tags';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+router.use(apiLimiter);
 
 // GET /api/events — list all events, optional ?tag_id= and ?start=/&end= filters
 router.get('/', asyncHandler((req: Request, res: Response) => {

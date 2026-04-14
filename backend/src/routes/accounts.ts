@@ -10,8 +10,10 @@ import { collectAccountStats } from '../platforms/account-stats';
 import { insertPollLog } from '../db/queries/logs';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+router.use(apiLimiter);
 
 const VALID_PLATFORMS = ['github', 'ga4', 'bing'];
 

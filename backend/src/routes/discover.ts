@@ -5,8 +5,10 @@ import db from '../db/connection';
 import { decryptCredentials } from '../crypto/credentials';
 import { asyncHandler } from '../middleware/asyncHandler';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+router.use(apiLimiter);
 
 // GET /api/accounts/:id/discover — list browsable content for an account
 router.get('/:id/discover', asyncHandler(async (req: Request, res: Response) => {
