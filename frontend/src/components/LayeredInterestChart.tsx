@@ -3,6 +3,51 @@ import { C } from '../theme';
 
 const font = "'DM Mono', monospace";
 
+export interface ChartEvent {
+  id: number;
+  name: string;
+  event_date: string;
+}
+
+/** Map an event date to an array index for the given range, or -1 if out of range. */
+function eventToIndex(eventDate: string, range: string, dataLen: number): number {
+  const now = new Date();
+  const ed = new Date(eventDate + (eventDate.includes('T') ? '' : 'T12:00:00'));
+
+  if (range === 'hourly') {
+    const diffMs = now.getTime() - ed.getTime();
+    const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+    const idx = (dataLen - 1) - diffHours;
+    return idx >= 0 && idx < dataLen ? idx : -1;
+  } else if (range === 'weekly') {
+    // Find current week start (Monday)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayDay = today.getDay();
+    const thisWeekStart = new Date(today);
+    thisWeekStart.setDate(today.getDate() - (todayDay === 0 ? 6 : todayDay - 1));
+
+    const eventDay = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+    const eventDayOfWeek = eventDay.getDay();
+    const eventWeekStart = new Date(eventDay);
+    eventWeekStart.setDate(eventDay.getDate() - (eventDayOfWeek === 0 ? 6 : eventDayOfWeek - 1));
+
+    const diffWeeks = Math.round((thisWeekStart.getTime() - eventWeekStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+    const idx = (dataLen - 1) - diffWeeks;
+    return idx >= 0 && idx < dataLen ? idx : -1;
+  } else if (range === 'monthly') {
+    const diffMonths = (now.getFullYear() - ed.getFullYear()) * 12 + (now.getMonth() - ed.getMonth());
+    const idx = (dataLen - 1) - diffMonths;
+    return idx >= 0 && idx < dataLen ? idx : -1;
+  } else {
+    // daily
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const eventDay = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+    const diffDays = Math.round((today.getTime() - eventDay.getTime()) / (1000 * 60 * 60 * 24));
+    const idx = (dataLen - 1) - diffDays;
+    return idx >= 0 && idx < dataLen ? idx : -1;
+  }
+}
+
 function getLabels(range: string = 'daily', count: number = 7): string[] {
   const labels: string[] = [];
   const now = new Date();
@@ -45,7 +90,7 @@ export interface LaneChartItem {
   engagementHistory?: number[];
 }
 
-function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneColor = false }: { items: LaneChartItem[]; width: number; height: number; lane: string; range?: string; useLaneColor?: boolean }) {
+function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneColor = false, events = [] }: { items: LaneChartItem[]; width: number; height: number; lane: string; range?: string; useLaneColor?: boolean; events?: ChartEvent[] }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const dataLen = range === 'hourly' ? 24 : 7;
   const labels = getLabels(range, dataLen);
@@ -100,6 +145,21 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneC
         <text key={i} x={toX(i)} y={height - 4} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
       ) : null)}
 
+      {/* Event markers */}
+      {events.map(ev => {
+        const idx = eventToIndex(ev.event_date, range, dataLen);
+        if (idx < 0) return null;
+        const x = toX(idx);
+        const label = ev.name.length > 14 ? ev.name.slice(0, 13) + '…' : ev.name;
+        return (
+          <g key={`ev-${ev.id}`}>
+            <line x1={x} y1={padT} x2={x} y2={padT + cH} stroke={C.accent} strokeWidth={1.5} strokeDasharray="4,3" opacity={0.7} />
+            <circle cx={x} cy={padT - 2} r={3} fill={C.accent} />
+            <text x={x + 5} y={padT - 4} fontSize="8" fill={C.accent} fontFamily={font} fontWeight="700">{label}</text>
+          </g>
+        );
+      })}
+
       {/* Platform areas + lines */}
       {activePlatforms.map(platform => {
         const data = platformData[platform];
@@ -139,10 +199,12 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneC
           value: platformData[p][hoverIdx] ?? 0,
           color: (C[(PLATFORM_DISPLAY[p] || p) as keyof typeof C] || C.accent) as string,
         }));
+        const hoveredEvents = events.filter(ev => eventToIndex(ev.event_date, range, dataLen) === hoverIdx);
         const tipW = 150;
-        const tipH = 20 + lines.length * 20;
+        const tipH = 20 + lines.length * 20 + (hoveredEvents.length > 0 ? 4 + hoveredEvents.length * 16 : 0);
         const tipX = x + tipW + 8 > width ? x - tipW - 4 : x + 8;
         const tipY = Math.max(padT, padT + 4);
+        const evY = 20 + lines.length * 20;
         return (
           <g>
             <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={6} fill={C.bgCard} stroke={C.border} strokeWidth={0.5} opacity={0.95} />
@@ -152,6 +214,12 @@ function LayeredChartSVG({ items, width, height, lane, range = 'daily', useLaneC
                 <circle cx={tipX + 12} cy={tipY + 32 + li * 20} r={4} fill={l.color} />
                 <text x={tipX + 22} y={tipY + 36 + li * 20} fontSize="12" fill={C.textSoft} fontFamily={font}>{l.name}</text>
                 <text x={tipX + tipW - 10} y={tipY + 36 + li * 20} fontSize="12" fontWeight="700" fill={C.text} fontFamily={font} textAnchor="end">{l.value.toFixed(0)}</text>
+              </g>
+            ))}
+            {hoveredEvents.map((ev, ei) => (
+              <g key={`ev-tip-${ev.id}`}>
+                <circle cx={tipX + 12} cy={tipY + evY + 8 + ei * 16} r={3} fill={C.accent} />
+                <text x={tipX + 22} y={tipY + evY + 12 + ei * 16} fontSize="10" fontWeight="600" fill={C.accent} fontFamily={font}>{ev.name.length > 16 ? ev.name.slice(0, 15) + '…' : ev.name}</text>
               </g>
             ))}
           </g>
@@ -170,7 +238,7 @@ const LANE_COLORS: Record<string, string> = {
 const ALL_LANES = ['Reach', 'Interest', 'Engagement'];
 
 /** SVG chart showing all three lanes overlaid with their respective colors. */
-function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: LaneChartItem[]; width: number; height: number; range?: string }) {
+function AllLanesChartSVG({ items, width, height, range = 'daily', events = [] }: { items: LaneChartItem[]; width: number; height: number; range?: string; events?: ChartEvent[] }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const dataLen = range === 'hourly' ? 24 : 7;
   const labels = getLabels(range, dataLen);
@@ -220,6 +288,21 @@ function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: La
         <text key={i} x={toX(i)} y={height - 4} fontSize="9" fill={hoverIdx === i ? C.text : C.textFaint} textAnchor="middle" fontFamily="monospace">{l}</text>
       ) : null)}
 
+      {/* Event markers */}
+      {events.map(ev => {
+        const idx = eventToIndex(ev.event_date, range, dataLen);
+        if (idx < 0) return null;
+        const x = toX(idx);
+        const label = ev.name.length > 14 ? ev.name.slice(0, 13) + '…' : ev.name;
+        return (
+          <g key={`ev-${ev.id}`}>
+            <line x1={x} y1={padT} x2={x} y2={padT + cH} stroke={C.accent} strokeWidth={1.5} strokeDasharray="4,3" opacity={0.7} />
+            <circle cx={x} cy={padT - 2} r={3} fill={C.accent} />
+            <text x={x + 5} y={padT - 4} fontSize="8" fill={C.accent} fontFamily={font} fontWeight="700">{label}</text>
+          </g>
+        );
+      })}
+
       {/* Lane areas + lines */}
       {ALL_LANES.map((lane, laneIdx) => {
         const data = laneData[lane];
@@ -260,10 +343,12 @@ function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: La
           value: laneData[lane][hoverIdx] ?? 0,
           color: LANE_COLORS[lane] || C.accent,
         }));
+        const hoveredEvents = events.filter(ev => eventToIndex(ev.event_date, range, dataLen) === hoverIdx);
         const tipW = 150;
-        const tipH = 20 + lines.length * 20;
+        const tipH = 20 + lines.length * 20 + (hoveredEvents.length > 0 ? 4 + hoveredEvents.length * 16 : 0);
         const tipX = x + tipW + 8 > width ? x - tipW - 4 : x + 8;
         const tipY = Math.max(padT, padT + 4);
+        const evY = 20 + lines.length * 20;
         return (
           <g>
             <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={6} fill={C.bgCard} stroke={C.border} strokeWidth={0.5} opacity={0.95} />
@@ -275,6 +360,12 @@ function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: La
                 <text x={tipX + tipW - 10} y={tipY + 36 + li * 20} fontSize="12" fontWeight="700" fill={C.text} fontFamily={font} textAnchor="end">{l.value.toFixed(0)}</text>
               </g>
             ))}
+            {hoveredEvents.map((ev, ei) => (
+              <g key={`ev-tip-${ev.id}`}>
+                <circle cx={tipX + 12} cy={tipY + evY + 8 + ei * 16} r={3} fill={C.accent} />
+                <text x={tipX + 22} y={tipY + evY + 12 + ei * 16} fontSize="10" fontWeight="600" fill={C.accent} fontFamily={font}>{ev.name.length > 16 ? ev.name.slice(0, 15) + '…' : ev.name}</text>
+              </g>
+            ))}
           </g>
         );
       })()}
@@ -282,7 +373,7 @@ function AllLanesChartSVG({ items, width, height, range = 'daily' }: { items: La
   );
 }
 
-export default function LayeredInterestChart({ items, lane = 'Interest', tag, onClose, range = 'daily' }: { items: LaneChartItem[]; lane?: string; tag?: string; onClose?: () => void; range?: string }) {
+export default function LayeredInterestChart({ items, lane = 'Interest', tag, onClose, range = 'daily', events = [] }: { items: LaneChartItem[]; lane?: string; tag?: string; onClose?: () => void; range?: string; events?: ChartEvent[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(500);
 
@@ -335,8 +426,8 @@ export default function LayeredInterestChart({ items, lane = 'Interest', tag, on
       </div>
 
       {isAllLanes
-        ? <AllLanesChartSVG items={items} width={width - 40} height={160} range={range} />
-        : <LayeredChartSVG items={items} width={width - 40} height={160} lane={lane} range={range} useLaneColor />
+        ? <AllLanesChartSVG items={items} width={width - 40} height={160} range={range} events={events} />
+        : <LayeredChartSVG items={items} width={width - 40} height={160} lane={lane} range={range} useLaneColor events={events} />
       }
     </div>
   );
