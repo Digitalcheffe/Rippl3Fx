@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../auth/jwt';
+import { getCookie } from '../utils/cookies';
 
 export interface AuthRequest extends Request {
   user?: { userId: number };
@@ -7,7 +8,7 @@ export interface AuthRequest extends Request {
 
 // Route-level middleware — always requires a valid token
 export function requireAuth(req: AuthRequest, res: Response, next: NextFunction): void {
-  const token = req.cookies?.token;
+  const token = getCookie(req, 'token');
   if (!token) {
     res.status(401).json({ error: 'Not authenticated' });
     return;
