@@ -7,8 +7,10 @@ import { AuthRequest, requireAuth } from '../middleware/auth';
 import { clearWeekStartCache } from '../utils/week';
 import { rerollWeeklyData } from '../rollup/weekly';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { authLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+router.use(authLimiter);
 
 // GET /api/auth/status — first-run detection
 router.get('/status', asyncHandler((_req: Request, res: Response) => {

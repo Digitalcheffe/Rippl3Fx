@@ -2,8 +2,10 @@ import { Router, Request, Response } from 'express';
 import { getAllTags, getTagById, getTagByName, createTag, deleteTag, getTagsForItem, assignTagToItem, removeTagFromItem, getItemsForTag } from '../db/queries/tags';
 import { getItemById } from '../db/queries/items';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+router.use(apiLimiter);
 
 // GET /api/tags
 router.get('/', asyncHandler((_req: Request, res: Response) => {

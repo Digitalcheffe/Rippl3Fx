@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import db from '../db/connection';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+router.use(apiLimiter);
 
 interface PerformanceWeights {
   id: number;

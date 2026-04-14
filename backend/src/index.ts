@@ -2,10 +2,11 @@ import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { migrate } from './db/migrate';
 import { authMiddleware } from './middleware/auth';
+import { csrfProtection } from './middleware/csrf';
+import { apiLimiter } from './middleware/rateLimiter';
 import authRouter from './routes/auth';
 import accountsRouter from './routes/accounts';
 import itemsRouter from './routes/items';
@@ -29,20 +30,15 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
-
-// Global rate limit — 100 requests per minute per IP
-app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false }));
-
-// Strict rate limit on auth routes — 10 requests per minute per IP
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+app.use('/api', csrfProtection);
 
 // Health check (no auth)
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', apiLimiter, (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Auth routes (no auth required, strict rate limit)
-app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/auth', authRouter);
 
 // JWT middleware for all other /api routes
 app.use(authMiddleware);
@@ -70,7 +66,7 @@ const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
 
 // SPA fallback — serve index.html for all non-API routes
-app.get('*', (_req, res) => {
+app.get('*', apiLimiter, (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
