@@ -98,7 +98,8 @@ export default function LaneSummary({ items, performanceScore, performanceVeloci
         );
       })}
 
-      {performanceScore != null && (() => {
+      {/* Performance Score hidden for v0.2.0 — replaced by Ripple Index */}
+      {false && performanceScore != null && (() => {
         const isActive = activeCard === 'Performance';
         return (
         <div onClick={() => onCardClick?.('Performance')} style={{

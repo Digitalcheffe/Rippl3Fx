@@ -135,8 +135,8 @@ export default function StatCard({ item, index = 0, onClick }: { item: StatCardI
         })}
       </div>
 
-      {/* Performance score */}
-      {item.performanceScore != null && item.performanceScore > 0 && (
+      {/* Performance score — hidden for v0.2.0 */}
+      {false && item.performanceScore != null && item.performanceScore > 0 && (
         <>
           <div style={{ height: 1, background: C.border }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
