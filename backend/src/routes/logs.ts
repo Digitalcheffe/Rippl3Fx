@@ -2,11 +2,9 @@ import { Router, Request, Response } from 'express';
 import { getPollLogs } from '../db/queries/logs';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { apiLimiter } from '../middleware/rateLimiter';
-import { doubleCsrfProtection } from '../middleware/csrf';
 
 const router = Router();
 router.use(apiLimiter);
-router.use(doubleCsrfProtection);
 
 // GET /api/logs?page=1&limit=100
 router.get('/', asyncHandler((req: Request, res: Response) => {
