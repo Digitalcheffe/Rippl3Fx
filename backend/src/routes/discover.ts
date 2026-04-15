@@ -6,11 +6,9 @@ import { decryptCredentials } from '../crypto/credentials';
 import { asyncHandler } from '../middleware/asyncHandler';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 import { apiLimiter } from '../middleware/rateLimiter';
-import { doubleCsrfProtection } from '../middleware/csrf';
 
 const router = Router();
 router.use(apiLimiter);
-router.use(doubleCsrfProtection);
 
 // GET /api/accounts/:id/discover — list browsable content for an account
 router.get('/:id/discover', asyncHandler(async (req: Request, res: Response) => {

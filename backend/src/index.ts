@@ -4,7 +4,6 @@ import cors from 'cors';
 import path from 'path';
 import { migrate } from './db/migrate';
 import { authMiddleware } from './middleware/auth';
-import { generateCsrfToken } from './middleware/csrf';
 import { apiLimiter } from './middleware/rateLimiter';
 import { parseCookies } from './middleware/parseCookies';
 import authRouter from './routes/auth';
@@ -30,14 +29,13 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 // Trust first reverse proxy (Traefik, nginx, Docker networking, etc.)
 app.set('trust proxy', 1);
 
-app.use(cors());
+const corsOrigin = process.env.CORS_ORIGIN || '*';
+app.use(cors({
+  origin: corsOrigin === '*' ? true : corsOrigin,
+  credentials: true,
+}));
 app.use(express.json());
 app.use(parseCookies);
-// CSRF token endpoint — frontend calls this to get a token for mutation requests
-app.get('/api/csrf-token', apiLimiter, (req, res) => {
-  const token = generateCsrfToken(req, res);
-  res.json({ token });
-});
 
 // Health check (no auth)
 app.get('/api/health', apiLimiter, (_req, res) => {

@@ -5,11 +5,9 @@ import { getAccountById } from '../db/queries/accounts';
 import { purgeTrackedMetrics } from '../db/queries/tracked';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { apiLimiter } from '../middleware/rateLimiter';
-import { doubleCsrfProtection } from '../middleware/csrf';
 
 const router = Router();
 router.use(apiLimiter);
-router.use(doubleCsrfProtection);
 
 // GET /api/items
 router.get('/', asyncHandler((_req: Request, res: Response) => {
