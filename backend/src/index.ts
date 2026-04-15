@@ -6,6 +6,7 @@ import { migrate } from './db/migrate';
 import { authMiddleware } from './middleware/auth';
 import { generateCsrfToken } from './middleware/csrf';
 import { apiLimiter } from './middleware/rateLimiter';
+import { parseCookies } from './middleware/parseCookies';
 import authRouter from './routes/auth';
 import accountsRouter from './routes/accounts';
 import itemsRouter from './routes/items';
@@ -26,8 +27,12 @@ scheduler.start();
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
+// Trust first reverse proxy (Traefik, nginx, Docker networking, etc.)
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json());
+app.use(parseCookies);
 // CSRF token endpoint — frontend calls this to get a token for mutation requests
 app.get('/api/csrf-token', apiLimiter, (req, res) => {
   const token = generateCsrfToken(req, res);
