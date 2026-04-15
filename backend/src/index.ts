@@ -29,9 +29,8 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 // Trust first reverse proxy (Traefik, nginx, Docker networking, etc.)
 app.set('trust proxy', 1);
 
-const corsOrigin = process.env.CORS_ORIGIN || '*';
 app.use(cors({
-  origin: corsOrigin === '*' ? true : corsOrigin,
+  origin: process.env.CORS_ORIGIN || false,
   credentials: true,
 }));
 app.use(express.json());

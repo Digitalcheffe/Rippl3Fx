@@ -72,7 +72,7 @@ All environment variables are **optional**. The app works out of the box with no
 | `JWT_SECRET` | Auto-generated | Override the JWT signing secret |
 | `PORT` | `3000` | Server port |
 | `TZ` | `UTC` | Timezone for rollups and date boundaries (e.g. `America/New_York`) |
-| `CORS_ORIGIN` | `*` (all origins) | Lock down to a specific origin (e.g. `https://rippl3fx.example.com`) |
+| `CORS_ORIGIN` | Same-origin only | Set when behind a reverse proxy (e.g. `https://rippl3fx.example.com`) |
 
 If `ENCRYPTION_KEY` or `JWT_SECRET` are not set, the app generates random secrets on first startup and stores them in `/data/config.json`. Setting env vars overrides the stored values.
 
