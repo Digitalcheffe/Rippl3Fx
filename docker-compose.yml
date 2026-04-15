@@ -11,6 +11,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-}
       - PORT=${PORT:-3000}
       - TZ=${TZ:-}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
 
 volumes:
   rippl3fx-data:

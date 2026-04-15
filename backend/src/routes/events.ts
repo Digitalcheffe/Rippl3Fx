@@ -14,11 +14,9 @@ import {
 import { getTagById } from '../db/queries/tags';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { apiLimiter } from '../middleware/rateLimiter';
-import { doubleCsrfProtection } from '../middleware/csrf';
 
 const router = Router();
 router.use(apiLimiter);
-router.use(doubleCsrfProtection);
 
 // GET /api/events — list all events, optional ?tag_id= and ?start=/&end= filters
 router.get('/', asyncHandler((req: Request, res: Response) => {

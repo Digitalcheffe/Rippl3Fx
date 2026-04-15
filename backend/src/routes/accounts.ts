@@ -11,11 +11,9 @@ import { insertPollLog } from '../db/queries/logs';
 import type { GithubCredentials, GA4Credentials, BingCredentials } from '../types';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { apiLimiter } from '../middleware/rateLimiter';
-import { doubleCsrfProtection } from '../middleware/csrf';
 
 const router = Router();
 router.use(apiLimiter);
-router.use(doubleCsrfProtection);
 
 const VALID_PLATFORMS = ['github', 'ga4', 'bing'];
 
